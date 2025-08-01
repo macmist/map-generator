@@ -8,7 +8,14 @@ type Point = {
   y: number;
 };
 
-const PointComponent = ({ x, y }: Point, color?: string) => {
+type Edge = {
+  start: Point;
+  end: Point;
+};
+
+type PointComponentProps = Point & { color?: string };
+
+const PointComponent = ({ x, y, color }: PointComponentProps) => {
   return (
     <Group>
       <Line
@@ -29,21 +36,48 @@ const PointComponent = ({ x, y }: Point, color?: string) => {
   );
 };
 
+const POINTS: Point[] = [
+  { x: 100, y: 100 },
+  { x: 200, y: 200 },
+  { x: 200, y: 300 },
+];
+
 export const PlayGround = () => {
   const [x, setX] = useState<number>(0);
   const [y, setY] = useState<number>(0);
-  const [points, setPoints] = useState<Point[]>([]);
+  const [points, setPoints] = useState<Point[]>(POINTS);
+  const [vertices, setVertices] = useState<Point[]>([]);
+  const [finshedEdges, setFinishedEdges] = useState<Edge[]>([]);
 
   useEffect(() => {
     const fortune = new FortuneProcessor();
 
     points.forEach((p) => {
-      fortune.addSite({ x: p.x, y: p.y });
+      console.log("Adding site:", p);
+      fortune.addSite({ x: p.x, y: p.y }); // convert y to canvas coordinates
     });
     if (points.length > 0) {
       fortune.computeFortune();
+      fortune.bindToBox({
+        minX: 0,
+        minY: 0,
+        maxX: 700,
+        maxY: 700,
+      });
+      console.log("Edges:", fortune.edges);
+      console.log("Vertices:", fortune.vertices);
+      fortune.vertices.forEach((v) => {
+        setVertices((prev) => [...prev, { x: v.x, y: v.y }]);
+      });
+      fortune.edges.forEach((edge) => {
+        const start = { x: edge.start[0], y: edge.start[1] };
+        const end = edge.end
+          ? { x: edge.end[0], y: edge.end[1] }
+          : { x: start.x, y: start.y }; // Handle null end
+        setFinishedEdges((prev) => [...prev, { start, end }]);
+      });
     }
-  }, [points]);
+  }, [points, setVertices]);
 
   const calculateParabola = (focus: Point, directrix: number): Point[] => {
     const h = focus.x;
@@ -78,14 +112,27 @@ export const PlayGround = () => {
               setX(pos.x);
             }
           }}
-          onClick={() => {
+          onClick={(e) => {
+            const stage = e.target.getStage();
+            stage?.getLayers().forEach((layer) => {
+              if (layer.id() === "edges" || layer.id() === "vertices") {
+                console.log("Clearing layer:", layer.id());
+                layer.removeChildren();
+              }
+            });
+
             points.push({ x, y });
             setPoints([...points]);
           }}
         >
-          <Layer>
+          <Layer id="points">
             {points.map((p, i) => (
               <PointComponent key={i} x={p.x} y={p.y} />
+            ))}
+          </Layer>
+          <Layer id="vertices">
+            {vertices.map((p, i) => (
+              <PointComponent key={i} x={p.x} y={p.y} color="red" />
             ))}
           </Layer>
           {/* <Layer>
@@ -106,6 +153,17 @@ export const PlayGround = () => {
           {/* <Layer>
             <Line x={0} y={y} stroke={"red"} points={[0, 0, 1000, 0]} />
           </Layer> */}
+          <Layer id="edges">
+            {finshedEdges.map((edge, i) => (
+              <Line
+                key={i}
+                x={0}
+                y={0}
+                stroke={"green"}
+                points={[edge.start.x, edge.start.y, edge.end.x, edge.end.y]}
+              />
+            ))}
+          </Layer>
         </Stage>
       </div>
     </Container>

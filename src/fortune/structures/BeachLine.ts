@@ -12,12 +12,6 @@ export class BeachLine {
     this.root = arc;
   }
 
-  insertArc(arc: Arc): void {
-    if (this.root === null) {
-      this.root = arc;
-    }
-  }
-
   findArcAboveX(x: number, y: number): Arc | null {
     let current: Arc | null = this.root;
     if (!current) return null;
@@ -25,7 +19,7 @@ export class BeachLine {
 
     while (current.next) {
       const bp = findIntersection(current.site, current.next.site, y);
-      if (x < bp) {
+      if (x < bp || Math.abs(x - bp) < 1e-9) {
         return current;
       }
       current = current?.next;

@@ -1,10 +1,12 @@
 import { Site } from "./Site";
+import { Vertex } from "./Vertex";
 
 export class Edge {
   public start: [number, number];
 
   public end: [number, number] | null = null;
-  public direction: [number, number] | null = null;
+  public direction: [number, number];
+  public vertex: Vertex | null = null;
 
   constructor(
     public leftSite: Site,

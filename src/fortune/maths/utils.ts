@@ -15,9 +15,10 @@ export function findIntersection(p: Site, r: Site, y: number): number {
     return (p.x + r.x) / 2; // If they are at the same height, return the midpoint
   }
 
+  if (p.y === y) return p.x; // If the point is at the height of the site, return its x-coordinate
+  if (r.y === y) return r.x; // If the point is at the
+
   // Edge cases for when y is exactly at the height of one of the sites
-  if (p.y === y) return p.x;
-  if (r.y === y) return r.x;
 
   const dp = 2 * (p.y - y);
   const dr = 2 * (r.y - y);
@@ -26,6 +27,10 @@ export function findIntersection(p: Site, r: Site, y: number): number {
   const b = -2 * (p.x / dp - r.x / dr);
   const c =
     (p.x ** 2 + p.y ** 2 - y ** 2) / dp - (r.x ** 2 + r.y ** 2 - y ** 2) / dr;
+
+  if (Math.abs(a) < 1e-10) {
+    return -c / b;
+  }
 
   // Solve the quadratic equation ax^2 + bx + c = 0
   const delta = b ** 2 - 4 * a * c;
@@ -40,7 +45,7 @@ export function findIntersection(p: Site, r: Site, y: number): number {
   const x2 = (-b - s) / (2 * a);
 
   // Return the x-coordinate of the intersection point
-  return p.y < r.y ? Math.max(x1, x2) : Math.min(x1, x2);
+  return p.y > r.y ? Math.max(x1, x2) : Math.min(x1, x2);
 }
 
 export enum Orientation {
@@ -50,9 +55,9 @@ export enum Orientation {
 }
 
 export const orientation = (p: Site, q: Site, r: Site): Orientation => {
-  const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+  const val = (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
   if (val === 0) return Orientation.COLLINEAR; // collinear
-  return val > 0 ? Orientation.CLOCKWISE : Orientation.COUNTERCLOCKWISE; // clock or counterclock wise
+  return val > 0 ? Orientation.COUNTERCLOCKWISE : Orientation.CLOCKWISE; // clock or counterclock wise
 };
 
 export const getCircumcircle = (

@@ -23,13 +23,16 @@ export class EventQueue {
   }
 
   pop(): Event | undefined {
-    const event = this.events.shift();
-    return event;
+    while (this.events.length > 0) {
+      const e = this.events.shift();
+      if (e && e.valid) return e;
+    }
+    return undefined;
   }
 
   peek(): Event | undefined {
     const element = this.events[0];
-    return element ? { ...element } : undefined; // Return a copy to avoid mutation
+    return element;
   }
 
   isEmpty(): boolean {
