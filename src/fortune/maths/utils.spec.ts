@@ -1,5 +1,5 @@
 import { Event } from "../definitions/Event";
-import { compareEvents } from "./utils";
+import { compareEvents, findIntersection } from "./utils";
 
 describe("Compare Events", () => {
   it("should correctly compare by y", () => {
@@ -27,5 +27,30 @@ describe("Compare Events", () => {
     const event1 = new Event(1, 2);
     const event2 = new Event(1, 2);
     expect(compareEvents(event1, event2)).toBe(0); // event1 === event2
+  });
+});
+
+describe("Find Intersection", () => {
+  it("should find intersection for two sites at different heights", () => {
+    const site1 = { x: 1, y: 2 };
+    const site2 = { x: 3, y: 4 };
+    const y = 3;
+
+    expect(findIntersection(site1, site2, y)).toBeCloseTo(2); // Linear interpolation
+  });
+
+  it("should return midpoint for two sites at the same height", () => {
+    const site1 = { x: 1, y: 2 };
+    const site2 = { x: 3, y: 2 };
+    const y = 2;
+
+    expect(findIntersection(site1, site2, y)).toBe(2); // Midpoint
+  });
+
+  it("should handle vertical alignment", () => {
+    const site1 = { x: 5, y: 0 };
+    const site2 = { x: 5, y: 10 };
+    const y = 5;
+    expect(findIntersection(site1, site2, y)).toBe(5); // Same x value
   });
 });
