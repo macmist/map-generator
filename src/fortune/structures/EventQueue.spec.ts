@@ -1,4 +1,5 @@
 import { Event } from "../definitions/Event";
+import { compareEvents } from "../maths/utils";
 import { EventQueue } from "./EventQueue";
 
 describe("EventQueue", () => {
@@ -76,5 +77,31 @@ describe("EventQueue", () => {
     const e2 = new Event(150, 200); // right
     const queue = new EventQueue([e2, e1]);
     expect(queue.pop()).toBe(e1);
+  });
+
+  test("Stress test: random event ordering", () => {
+    const eventCount = 1000;
+    const events: Event[] = [];
+
+    // Generate random events
+    for (let i = 0; i < eventCount; i++) {
+      const x = Math.random() * 1000;
+      const y = Math.random() * 1000;
+      events.push(new Event(x, y));
+    }
+
+    // Copy and sort the expected order (ground truth)
+    const expected = [...events].sort(compareEvents);
+
+    // Initialize the queue
+    const queue = new EventQueue(events);
+
+    // Pop events from the queue and compare to expected
+    for (let i = 0; i < eventCount; i++) {
+      const popped = queue.pop();
+      expect(popped).toEqual(expected[i]);
+    }
+
+    expect(queue.isEmpty()).toBe(true);
   });
 });
