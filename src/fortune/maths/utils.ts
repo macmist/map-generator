@@ -42,3 +42,38 @@ export function findIntersection(p: Site, r: Site, y: number): number {
   // Return the x-coordinate of the intersection point
   return p.y < r.y ? Math.max(x1, x2) : Math.min(x1, x2);
 }
+
+export enum Orientation {
+  COLLINEAR = 0,
+  CLOCKWISE = 1,
+  COUNTERCLOCKWISE = 2,
+}
+
+export const orientation = (p: Site, q: Site, r: Site): Orientation => {
+  const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+  if (val === 0) return Orientation.COLLINEAR; // collinear
+  return val > 0 ? Orientation.CLOCKWISE : Orientation.COUNTERCLOCKWISE; // clock or counterclock wise
+};
+
+export const getCircumcircle = (
+  a: Site,
+  b: Site,
+  c: Site
+): { x: number; y: number; r: number } | null => {
+  const A = b.x - a.x;
+  const B = b.y - a.y;
+  const C = c.x - a.x;
+  const D = c.y - a.y;
+
+  const E = A * (a.x + b.x) + B * (a.y + b.y);
+  const F = C * (a.x + c.x) + D * (a.y + c.y);
+  const G = 2 * (A * (c.y - b.y) - B * (c.x - b.x));
+
+  if (G === 0) return null; // Points are collinear
+
+  const cx = (D * E - B * F) / G;
+  const cy = (A * F - C * E) / G;
+  const r = Math.hypot(a.x - cx, a.y - cy);
+
+  return { x: cx, y: cy, r };
+};

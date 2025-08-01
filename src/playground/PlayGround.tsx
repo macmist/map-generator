@@ -1,6 +1,7 @@
 import { Container } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Group, Layer, Line, Stage } from "react-konva";
+import { FortuneProcessor } from "../fortune/fortune";
 
 type Point = {
   x: number;
@@ -33,13 +34,22 @@ export const PlayGround = () => {
   const [y, setY] = useState<number>(0);
   const [points, setPoints] = useState<Point[]>([]);
 
+  useEffect(() => {
+    const fortune = new FortuneProcessor();
+
+    points.forEach((p) => {
+      fortune.addSite({ x: p.x, y: p.y });
+    });
+    if (points.length > 0) {
+      fortune.computeFortune();
+    }
+  }, [points]);
+
   const calculateParabola = (focus: Point, directrix: number): Point[] => {
     const h = focus.x;
     const k = (focus.y + directrix) / 2;
     const p = -Math.abs(focus.y - directrix) / 2;
     const res: Point[] = [];
-
-    console.log(h, k, p);
 
     if (p !== 0) {
       for (let x = 0; x < 700; x++) {
@@ -78,7 +88,7 @@ export const PlayGround = () => {
               <PointComponent key={i} x={p.x} y={p.y} />
             ))}
           </Layer>
-          <Layer>
+          {/* <Layer>
             {points.map((p, i) => {
               if (y >= p.y)
                 return (
@@ -92,10 +102,10 @@ export const PlayGround = () => {
                 );
               return <></>;
             })}
-          </Layer>
-          <Layer>
+          </Layer> */}
+          {/* <Layer>
             <Line x={0} y={y} stroke={"red"} points={[0, 0, 1000, 0]} />
-          </Layer>
+          </Layer> */}
         </Stage>
       </div>
     </Container>

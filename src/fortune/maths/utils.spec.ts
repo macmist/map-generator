@@ -1,5 +1,11 @@
 import { Event } from "../definitions/Event";
-import { compareEvents, findIntersection } from "./utils";
+import {
+  compareEvents,
+  findIntersection,
+  getCircumcircle,
+  Orientation,
+  orientation,
+} from "./utils";
 
 describe("Compare Events", () => {
   it("should correctly compare by y", () => {
@@ -52,5 +58,42 @@ describe("Find Intersection", () => {
     const site2 = { x: 5, y: 10 };
     const y = 5;
     expect(findIntersection(site1, site2, y)).toBe(5); // Same x value
+  });
+});
+
+describe("Orientation", () => {
+  it("should return COLLINEAR for collinear points", () => {
+    const p = { x: 0, y: 0 };
+    const q = { x: 1, y: 1 };
+    const r = { x: 2, y: 2 };
+    expect(orientation(p, q, r)).toBe(Orientation.COLLINEAR);
+  });
+
+  it("should return CLOCKWISE for clockwise orientation", () => {
+    const p = { x: 0, y: 0 };
+    const q = { x: 1, y: 2 };
+    const r = { x: 4, y: 4 };
+    expect(orientation(p, q, r)).toBe(Orientation.CLOCKWISE);
+  });
+
+  it("should return COUNTERCLOCKWISE for counterclockwise orientation", () => {
+    const p = { x: 0, y: 0 };
+    const q = { x: 4, y: 4 };
+    const r = { x: 1, y: 2 };
+    expect(orientation(p, q, r)).toBe(Orientation.COUNTERCLOCKWISE);
+  });
+});
+
+describe("Get Circumcircle", () => {
+  it("should return the circumcircle for three points", () => {
+    const a = { x: 0, y: 0 };
+    const b = { x: 4, y: 0 };
+    const c = { x: 2, y: 4 };
+
+    const circumcircle = getCircumcircle(a, b, c);
+    expect(circumcircle).toBeDefined();
+    expect(circumcircle?.x).toBeCloseTo(2);
+    expect(circumcircle?.y).toBeCloseTo(1.5);
+    expect(circumcircle?.r).toBeCloseTo(2.5);
   });
 });

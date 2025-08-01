@@ -1,9 +1,16 @@
 import { Arc } from "../definitions/Arc";
-import { Site } from "../definitions/Site";
 import { findIntersection } from "../maths/utils";
 
 export class BeachLine {
   private root: Arc | null = null;
+
+  head(): Arc | null {
+    return this.root;
+  }
+
+  setHead(arc: Arc): void {
+    this.root = arc;
+  }
 
   insertArc(arc: Arc): void {
     if (this.root === null) {
