@@ -123,8 +123,9 @@ export class FortuneProcessor {
       console.log("Setting new head arc in the beach line");
       this.beachLine.setHead(leftArc);
     }
+    const y = arcAbove.evaluate(site.x, this.sweepY);
 
-    const vertex = [site.x, this.sweepY];
+    const vertex = [site.x, y];
     const edgeLeft = new Edge(arcAbove.site, site, vertex[0], vertex[1]);
     const edgeRight = new Edge(site, arcAbove.site, vertex[0], vertex[1]);
     this.edges.push(edgeLeft, edgeRight);
@@ -147,22 +148,27 @@ export class FortuneProcessor {
     const leftSite = arc.prev.site;
     const rightSite = arc.next.site;
 
-    if (
-      orientation(leftSite, arc.site, rightSite) !==
-      Orientation.COUNTERCLOCKWISE
-    ) {
+    const circle = getCircumcircle(leftSite, arc.site, rightSite);
+    if (!circle) {
+      console.error("No circumcircle found for the arc");
+      return;
+    }
+
+    console.log(
+      "could be a circle at ",
+      circle.x,
+      circle.y,
+      "with radius",
+      circle.r
+    );
+
+    if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
       console.log(leftSite, arc.site, rightSite);
       console.log(orientation(leftSite, arc.site, rightSite));
       console.error(
         "Sites are not in counter-clockwise order, cannot form circle event"
       );
       return; // Not a valid event
-    }
-
-    const circle = getCircumcircle(leftSite, arc.site, rightSite);
-    if (!circle) {
-      console.error("No circumcircle found for the arc");
-      return;
     }
 
     const eventY = circle.y + circle.r;
@@ -173,6 +179,7 @@ export class FortuneProcessor {
     }
 
     const event = new Event(circle.x, eventY, null, arc);
+    event.circle = new Site(circle.x, circle.y); // Store the circle center
     console.log("inserting circle event at", event.x, event.y);
     arc.circleEvent = event;
     this.eventQueue.insert(event);
@@ -180,12 +187,15 @@ export class FortuneProcessor {
 
   handleCircleEvent(event: Event): void {
     const arc = event.arc;
-    if (!arc || !event.valid) {
+    if (!arc || !event.valid || !event.circle) {
       console.error("No arc found for circle event");
       return;
     }
 
-    const vertex = new Vertex(event.x, event.y);
+    const vertex = new Vertex(event.circle?.x, event.circle?.y);
+    if (event.arc && event.arc.edge) {
+      event.arc.edge.vertex = vertex;
+    }
     this.vertices.push(vertex);
 
     const prevArc = arc.prev;

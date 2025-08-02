@@ -54,6 +54,13 @@ export enum Orientation {
   COUNTERCLOCKWISE = 2,
 }
 
+export const calculateAngle = (p: Site, center: Site): number => {
+  const dx = p.x - center.x;
+  const dy = p.y - center.y;
+  const angle = Math.atan2(dy, dx); // Angle in radians
+  return angle < 0 ? angle + 2 * Math.PI : angle; // Normalize
+};
+
 export const orientation = (p: Site, q: Site, r: Site): Orientation => {
   const val = (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
   if (val === 0) return Orientation.COLLINEAR; // collinear
