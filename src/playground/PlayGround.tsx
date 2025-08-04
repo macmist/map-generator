@@ -2,8 +2,9 @@ import { Container } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Group, Layer, Line, Stage } from "react-konva";
 import { FortuneProcessor } from "../fortune/fortune";
+import { VisualFortune } from "../fortune/visual-fortune";
 
-type Point = {
+export type Point = {
   x: number;
   y: number;
 };
@@ -48,6 +49,11 @@ export const PlayGround = () => {
   const [points, setPoints] = useState<Point[]>(POINTS);
   const [vertices, setVertices] = useState<Point[]>([]);
   const [finshedEdges, setFinishedEdges] = useState<Edge[]>([]);
+  const [visualPoints, setVisualPoints] = useState<Point[]>([]);
+  const visualFortune = new VisualFortune();
+  points.forEach((p) => {
+    visualFortune.addSite({ x: p.x, y: p.y });
+  });
 
   useEffect(() => {
     const fortune = new FortuneProcessor();
@@ -82,7 +88,7 @@ export const PlayGround = () => {
   const calculateParabola = (focus: Point, directrix: number): Point[] => {
     const h = focus.x;
     const k = (focus.y + directrix) / 2;
-    const p = -Math.abs(focus.y - directrix) / 2;
+    const p = Math.abs(directrix - focus.y) / 2;
     const res: Point[] = [];
 
     if (p !== 0) {
@@ -96,22 +102,42 @@ export const PlayGround = () => {
     return res;
   };
 
+  const timeout = (delay: number) => {
+    return new Promise((res) => setTimeout(res, delay));
+  };
+
+  useEffect(() => {
+    console.log("Visual points updated:", visualPoints);
+  }, [visualPoints]);
+
+  const [isSweeping, setIsSweeping] = useState(false);
+  const sweep = async () => {
+    setVisualPoints([]);
+    setIsSweeping(true);
+    for (let i = 0; i < 700; i++) {
+      const y = 700 - i; // Invert y for canvas coordinates
+      setY(y);
+      // console.log("Sweeping at y:", i);
+      // Simulate a delay for the sweep line effect
+
+      if (visualFortune.isOnPoint(y)) {
+        console.log("Point found at y:", y);
+        visualFortune.next();
+      }
+      setVisualPoints(visualFortune.getPoints(700, y));
+      await timeout(10);
+    }
+    setIsSweeping(false);
+  };
+
   return (
     <Container>
       <h1>PlayGround</h1>
+      <button onClick={() => sweep()}>start</button>
       <div style={{ width: 700, height: 700, border: "1px solid black" }}>
         <Stage
           width={700}
           height={700}
-          onMouseMove={(e) => {
-            const pos = e.target.getRelativePointerPosition();
-            if (pos && pos.y > 0 && pos.y < 700) {
-              setY(pos.y);
-            }
-            if (pos && pos.x > 0 && pos.x < 700) {
-              setX(pos.x);
-            }
-          }}
           onClick={(e) => {
             const stage = e.target.getStage();
             stage?.getLayers().forEach((layer) => {
@@ -131,30 +157,37 @@ export const PlayGround = () => {
             ))}
           </Layer>
           <Layer id="vertices">
-            {vertices.map((p, i) => (
+            {/* {vertices.map((p, i) => (
               <PointComponent key={i} x={p.x} y={p.y} color="red" />
-            ))}
+            ))} */}
           </Layer>
-          {/* <Layer>
-            {points.map((p, i) => {
-              if (y >= p.y)
+          <Layer>
+            {/* {points.map((p, i) => {
+              if (y <= p.y)
                 return (
-                  <Line
-                    key={i}
-                    x={0}
-                    y={0}
-                    stroke={"blue"}
-                    points={calculateParabola(p, y).flatMap((p) => [p.x, p.y])}
-                  />
+                  // <Line
+                  //   key={i}
+                  //   x={0}
+                  //   y={0}
+                  //   stroke={"blue"}
+                  //   points={calculateParabola(p, y).flatMap((p) => [p.x, p.y])}
+                  // />
                 );
               return <></>;
-            })}
-          </Layer> */}
-          {/* <Layer>
+            })} */}
+
+            {visualPoints.length > 0 && (
+              <Line
+                stroke={"blue"}
+                points={visualPoints.flatMap((p) => [p.x, p.y])}
+              />
+            )}
+          </Layer>
+          <Layer>
             <Line x={0} y={y} stroke={"red"} points={[0, 0, 1000, 0]} />
-          </Layer> */}
+          </Layer>
           <Layer id="edges">
-            {finshedEdges.map((edge, i) => (
+            {/* {finshedEdges.map((edge, i) => (
               <Line
                 key={i}
                 x={0}
@@ -162,7 +195,7 @@ export const PlayGround = () => {
                 stroke={"green"}
                 points={[edge.start.x, edge.start.y, edge.end.x, edge.end.y]}
               />
-            ))}
+            ))} */}
           </Layer>
         </Stage>
       </div>

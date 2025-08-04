@@ -1,3 +1,4 @@
+import { Point } from "../../playground/PlayGround";
 import { Arc } from "../definitions/Arc";
 import { findIntersection } from "../maths/utils";
 
@@ -26,5 +27,25 @@ export class BeachLine {
     }
 
     return current;
+  }
+
+  getPoints(maxX: number, sweepY: number): Point[] {
+    const points: Point[] = [];
+    let current: Arc | null = this.root;
+    let x = 0;
+    while (current) {
+      let nextX = maxX;
+      if (current.next) {
+        nextX = findIntersection(current.site, current.next.site, sweepY);
+      }
+      for (let i = x; i <= nextX; i++) {
+        const yValue = current.evaluate(i, sweepY);
+        if (yValue === Infinity) continue; // Skip points that are not defined
+        points.push({ x: i, y: yValue });
+      }
+      current = current.next;
+    }
+    console.log("Beach line points:", points);
+    return points;
   }
 }
