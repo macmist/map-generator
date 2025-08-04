@@ -40,6 +40,8 @@ const POINTS: Point[] = [
   { x: 100, y: 100 },
   { x: 200, y: 200 },
   { x: 200, y: 300 },
+  // { x: 300, y: 150 },
+  // { x: 400, y: 250 },
 ];
 
 export const PlayGround = () => {
@@ -58,24 +60,28 @@ export const PlayGround = () => {
     });
     if (points.length > 0) {
       fortune.computeFortune();
-      fortune.bindToBox({
-        minX: 0,
-        minY: 0,
-        maxX: 700,
-        maxY: 700,
-      });
-      console.log("Edges:", fortune.edges);
-      console.log("Vertices:", fortune.vertices);
-      fortune.vertices.forEach((v) => {
-        setVertices((prev) => [...prev, { x: v.x, y: v.y }]);
-      });
-      fortune.edges.forEach((edge) => {
-        const start = { x: edge.start[0], y: edge.start[1] };
-        const end = edge.end
-          ? { x: edge.end[0], y: edge.end[1] }
-          : { x: start.x, y: start.y }; // Handle null end
-        setFinishedEdges((prev) => [...prev, { start, end }]);
-      });
+      // fortune.bindToBox({
+      //   minX: 0,
+      //   minY: 0,
+      //   maxX: 700,
+      //   maxY: 700,
+      // });
+      console.log("Fortune's algorithm completed");
+      console.log("Vertices:", fortune.dcel.vertices);
+      console.log("Faces:", fortune.dcel.faces);
+      console.log("HalfEdges:", fortune.dcel.halfEdges);
+      // console.log("Edges:", fortune.edges);
+      // console.log("Vertices:", fortune.vertices);
+      // fortune.vertices.forEach((v) => {
+      //   setVertices((prev) => [...prev, { x: v.x, y: v.y }]);
+      // });
+      // fortune.edges.forEach((edge) => {
+      //   const start = { x: edge.start[0], y: edge.start[1] };
+      //   const end = edge.end
+      //     ? { x: edge.end[0], y: edge.end[1] }
+      //     : { x: start.x, y: start.y }; // Handle null end
+      //   setFinishedEdges((prev) => [...prev, { start, end }]);
+      // });
     }
   }, [points, setVertices]);
 

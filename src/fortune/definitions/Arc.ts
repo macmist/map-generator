@@ -1,4 +1,4 @@
-import { Edge } from "./Edge";
+import { HalfEdge } from "./HalfEdge";
 import { Event } from "./Event";
 import { Site } from "./Site";
 
@@ -6,7 +6,7 @@ export class Arc {
   public prev: Arc | null = null;
   public next: Arc | null = null;
   public circleEvent: Event | null = null;
-  public edge: Edge | null = null;
+  public edge: HalfEdge | null = null;
 
   constructor(public site: Site) {}
 
