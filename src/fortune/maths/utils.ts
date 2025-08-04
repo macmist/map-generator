@@ -45,7 +45,8 @@ export function findIntersection(p: Site, r: Site, y: number): number {
   const x2 = (-b - s) / (2 * a);
 
   // Return the x-coordinate of the intersection point
-  return p.y > r.y ? Math.max(x1, x2) : Math.min(x1, x2);
+  if (y == 120) console.log("Intersection points:", x1, x2);
+  return p.y < r.y ? Math.max(x1, x2) : Math.min(x1, x2);
 }
 
 export enum Orientation {

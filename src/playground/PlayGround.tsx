@@ -40,7 +40,8 @@ const PointComponent = ({ x, y, color }: PointComponentProps) => {
 const POINTS: Point[] = [
   { x: 100, y: 100 },
   { x: 200, y: 200 },
-  { x: 200, y: 300 },
+  { x: 300, y: 350 },
+  { x: 500, y: 600 },
 ];
 
 export const PlayGround = () => {
@@ -55,35 +56,33 @@ export const PlayGround = () => {
     visualFortune.addSite({ x: p.x, y: p.y });
   });
 
-  useEffect(() => {
-    const fortune = new FortuneProcessor();
+  // useEffect(() => {
+  //   const fortune = new FortuneProcessor();
 
-    points.forEach((p) => {
-      console.log("Adding site:", p);
-      fortune.addSite({ x: p.x, y: p.y }); // convert y to canvas coordinates
-    });
-    if (points.length > 0) {
-      fortune.computeFortune();
-      fortune.bindToBox({
-        minX: 0,
-        minY: 0,
-        maxX: 700,
-        maxY: 700,
-      });
-      console.log("Edges:", fortune.edges);
-      console.log("Vertices:", fortune.vertices);
-      fortune.vertices.forEach((v) => {
-        setVertices((prev) => [...prev, { x: v.x, y: v.y }]);
-      });
-      fortune.edges.forEach((edge) => {
-        const start = { x: edge.start[0], y: edge.start[1] };
-        const end = edge.end
-          ? { x: edge.end[0], y: edge.end[1] }
-          : { x: start.x, y: start.y }; // Handle null end
-        setFinishedEdges((prev) => [...prev, { start, end }]);
-      });
-    }
-  }, [points, setVertices]);
+  //   points.forEach((p) => {
+  //     fortune.addSite({ x: p.x, y: p.y }); // convert y to canvas coordinates
+  //   });
+  //   if (points.length > 0) {
+  //     fortune.computeFortune();
+  //     fortune.bindToBox({
+  //       minX: 0,
+  //       minY: 0,
+  //       maxX: 700,
+  //       maxY: 700,
+  //     });
+
+  //     fortune.vertices.forEach((v) => {
+  //       setVertices((prev) => [...prev, { x: v.x, y: v.y }]);
+  //     });
+  //     fortune.edges.forEach((edge) => {
+  //       const start = { x: edge.start[0], y: edge.start[1] };
+  //       const end = edge.end
+  //         ? { x: edge.end[0], y: edge.end[1] }
+  //         : { x: start.x, y: start.y }; // Handle null end
+  //       setFinishedEdges((prev) => [...prev, { start, end }]);
+  //     });
+  //   }
+  // }, [points, setVertices]);
 
   const calculateParabola = (focus: Point, directrix: number): Point[] => {
     const h = focus.x;
@@ -107,12 +106,17 @@ export const PlayGround = () => {
   };
 
   useEffect(() => {
-    console.log("Visual points updated:", visualPoints);
+    // console.log("Visual points updated:", visualPoints);
   }, [visualPoints]);
+
+  useEffect(() => {
+    // console.log("Visual points updated:", visualPoints);
+  }, [finshedEdges]);
 
   const [isSweeping, setIsSweeping] = useState(false);
   const sweep = async () => {
     setVisualPoints([]);
+    setFinishedEdges([]);
     setIsSweeping(true);
     for (let i = 0; i < 700; i++) {
       const y = 700 - i; // Invert y for canvas coordinates
@@ -121,10 +125,23 @@ export const PlayGround = () => {
       // Simulate a delay for the sweep line effect
 
       if (visualFortune.isOnPoint(y)) {
-        console.log("Point found at y:", y);
+        // console.log("Point found at y:", y);
         visualFortune.next();
       }
       setVisualPoints(visualFortune.getPoints(700, y));
+      setFinishedEdges([]);
+
+      for (const edge of visualFortune.getEdges(y).filter((e) => e.end)) {
+        setFinishedEdges((prev) => [
+          ...prev,
+          {
+            start: { x: edge.start[0], y: edge.start[1] },
+            end: edge.end
+              ? { x: edge.end[0], y: edge.end[1] }
+              : { x: edge.start[0], y: edge.start[1] },
+          },
+        ]);
+      }
       await timeout(10);
     }
     setIsSweeping(false);
@@ -187,15 +204,13 @@ export const PlayGround = () => {
             <Line x={0} y={y} stroke={"red"} points={[0, 0, 1000, 0]} />
           </Layer>
           <Layer id="edges">
-            {/* {finshedEdges.map((edge, i) => (
+            {finshedEdges.map((edge, i) => (
               <Line
                 key={i}
-                x={0}
-                y={0}
                 stroke={"green"}
                 points={[edge.start.x, edge.start.y, edge.end.x, edge.end.y]}
               />
-            ))} */}
+            ))}
           </Layer>
         </Stage>
       </div>

@@ -23,4 +23,19 @@ export class Edge {
     // Unit perpendicular vector (rotated 90° CW)
     this.direction = [dy / length, -dx / length];
   }
+
+  copy(): Edge {
+    const edge = new Edge(
+      this.leftSite,
+      this.rightSite,
+      this.start[0],
+      this.start[1]
+    );
+    edge.end = this.end ? [...this.end] : null;
+    edge.direction = [...this.direction];
+    edge.vertex = this.vertex
+      ? new Vertex(this.vertex.x, this.vertex.y, [...this.vertex.incidentEdges])
+      : null;
+    return edge;
+  }
 }

@@ -1,5 +1,6 @@
 import { Point } from "../playground/PlayGround";
 import { Arc } from "./definitions/Arc";
+import { Edge } from "./definitions/Edge";
 import { Event } from "./definitions/Event";
 import { Site } from "./definitions/Site";
 import { BeachLine } from "./structures/BeachLine";
@@ -74,6 +75,61 @@ export class VisualFortune {
       arcAbove.circleEvent = null;
     }
 
-    // this.splitArc(arcAbove, site);
+    this.splitArc(arcAbove, site);
+  }
+
+  getEdges(sweepY: number): Edge[] {
+    return this.beachLine.getEdges(sweepY);
+  }
+
+  splitArc(arcAbove: Arc, site: Site): void {
+    console.log(
+      "Splitting arc above site at:",
+      arcAbove.site.x,
+      arcAbove.site.y
+    );
+
+    const leftArc = new Arc(arcAbove.site);
+    console.log("Creating left arc:", leftArc.site.x, leftArc.site.y);
+    const middleArc = new Arc(site);
+    console.log("Creating midle arc:", site.x, site.y);
+    const rightArc = new Arc(arcAbove.site);
+    console.log("Creating right arc:", rightArc.site.x, rightArc.site.y);
+
+    leftArc.prev = arcAbove.prev;
+    leftArc.next = middleArc;
+
+    middleArc.prev = leftArc;
+    middleArc.next = rightArc;
+
+    rightArc.prev = middleArc;
+    rightArc.next = arcAbove.next;
+
+    if (leftArc.prev) leftArc.prev.next = leftArc;
+    if (rightArc.next) rightArc.next.prev = rightArc;
+
+    console.log("Displaying beach line");
+    let t: Arc | null = leftArc;
+    while (t) {
+      console.log("Arc:", t.site.x, t.site.y);
+      t = t.next;
+    }
+
+    if (arcAbove === this.beachLine.head()) {
+      console.log("Setting new head arc in the beach line");
+      this.beachLine.setHead(leftArc);
+    }
+    const y = arcAbove.evaluate(site.x, this.sweepY);
+
+    const vertex = [site.x, y];
+    const edgeLeft = new Edge(arcAbove.site, site, vertex[0], vertex[1]);
+    const edgeRight = new Edge(site, arcAbove.site, vertex[0], vertex[1]);
+    // this.edges.push(edgeLeft, edgeRight);
+
+    leftArc.edge = edgeLeft;
+    rightArc.edge = edgeRight;
+
+    // this.checkCircleEvents(leftArc);
+    // this.checkCircleEvents(rightArc);
   }
 }
