@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Group, Layer, Line, Stage } from "react-konva";
 import { FortuneProcessor } from "../fortune/fortune";
 import { VisualFortune } from "../fortune/visual-fortune";
+import { Site } from "../fortune/definitions/Site";
 
 export type Point = {
   x: number;
@@ -42,6 +43,7 @@ const POINTS: Point[] = [
   { x: 200, y: 200 },
   { x: 300, y: 350 },
   { x: 500, y: 600 },
+  { x: 250, y: 550 },
 ];
 
 export const PlayGround = () => {
@@ -53,7 +55,7 @@ export const PlayGround = () => {
   const [visualPoints, setVisualPoints] = useState<Point[]>([]);
   const visualFortune = new VisualFortune();
   points.forEach((p) => {
-    visualFortune.addSite({ x: p.x, y: p.y });
+    visualFortune.addSite(new Site(p.x, p.y));
   });
 
   // useEffect(() => {
@@ -118,14 +120,13 @@ export const PlayGround = () => {
     setVisualPoints([]);
     setFinishedEdges([]);
     setIsSweeping(true);
-    for (let i = 0; i < 700; i++) {
+    for (let i = 0; i < 502; i++) {
       const y = 700 - i; // Invert y for canvas coordinates
       setY(y);
       // console.log("Sweeping at y:", i);
       // Simulate a delay for the sweep line effect
 
-      if (visualFortune.isOnPoint(y)) {
-        // console.log("Point found at y:", y);
+      while (visualFortune.onPointOrAfterCircle(y)) {
         visualFortune.next();
       }
       setVisualPoints(visualFortune.getPoints(700, y));
@@ -142,7 +143,11 @@ export const PlayGround = () => {
           },
         ]);
       }
-      await timeout(10);
+      if (i > 350) {
+        await timeout(10);
+      } else {
+        await timeout(10);
+      }
     }
     setIsSweeping(false);
   };
@@ -163,9 +168,19 @@ export const PlayGround = () => {
                 layer.removeChildren();
               }
             });
-
-            points.push({ x, y });
-            setPoints([...points]);
+            console.log("Clicked at:", x, y);
+            // points.push({ x, y });
+            // setPoints([...points]);
+          }}
+          onMouseMove={(e) => {
+            const stage = e.target.getStage();
+            if (stage) {
+              const pos = stage.getPointerPosition();
+              if (pos) {
+                setX(pos.x);
+                // setY(pos.y);
+              }
+            }
           }}
         >
           <Layer id="points">
@@ -179,19 +194,17 @@ export const PlayGround = () => {
             ))} */}
           </Layer>
           <Layer>
-            {/* {points.map((p, i) => {
+            {points.map((p, i) => {
               if (y <= p.y)
                 return (
-                  // <Line
-                  //   key={i}
-                  //   x={0}
-                  //   y={0}
-                  //   stroke={"blue"}
-                  //   points={calculateParabola(p, y).flatMap((p) => [p.x, p.y])}
-                  // />
+                  <Line
+                    key={i}
+                    stroke={"green"}
+                    points={calculateParabola(p, y).flatMap((p) => [p.x, p.y])}
+                  />
                 );
               return <></>;
-            })} */}
+            })}
 
             {visualPoints.length > 0 && (
               <Line

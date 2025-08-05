@@ -46,8 +46,51 @@ export class BeachLine {
       }
       current = current.next;
     }
-    console.log("Edges at sweepY", sweepY, ":", edges);
     return edges;
+  }
+
+  display(): void {
+    let current: Arc | null = this.root;
+    console.log("-------------------------------------------");
+    console.log("Displaying beach line:");
+    while (current) {
+      console.log(
+        `Arc: ${current.site.x}, ${current.site.y}`,
+        current.prev,
+        current.next
+      );
+      current = current.next;
+    }
+    console.log("-------------------------------------------");
+  }
+
+  rebalance(): void {
+    let current: Arc | null = this.root;
+    while (current) {
+      if (current.next) {
+        if (current.next.site.equals(current.site)) {
+          // Remove the duplicate arc
+
+          current.next = current.next.next;
+          if (current.next) {
+            current.next.prev = current;
+          }
+        }
+      }
+      current = current.next;
+    }
+  }
+
+  getPoints2(maxX: number, sweepY: number): Point[] {
+    const points: Point[] = [];
+    for (let x = 0; x < maxX; x++) {
+      let above = this.findArcAboveX(x, sweepY);
+      if (!above) continue; // No arc above this x-coordinate
+      const yValue = above.evaluate(x, sweepY);
+      if (yValue === Infinity) continue; // Skip points that are not defined
+      points.push({ x, y: yValue });
+    }
+    return points;
   }
 
   getPoints(maxX: number, sweepY: number): Point[] {
@@ -57,36 +100,16 @@ export class BeachLine {
     while (current) {
       let nextX = maxX;
       if (current.next) {
-        nextX = findIntersection(current.site, current.next.site, sweepY);
-        if (sweepY === 120) {
-          console.log(
-            "intersection:",
-            current.site.x,
-            current.next.site.x,
-            nextX
-          );
-        }
-        if (sweepY === 120) {
-          console.log(
-            "computing points for arc:",
-            current.site.x,
-            current.site.y,
-            "from",
-            x,
-            "to",
-            nextX
-          );
-        }
+        const [first, second] = [current.site, current.next.site];
+        nextX = findIntersection(first, second, sweepY);
       }
-      for (x; x <= nextX; x++) {
+
+      for (x; x <= Math.floor(nextX); x++) {
         const yValue = current.evaluate(x, sweepY);
         if (yValue === Infinity) continue; // Skip points that are not defined
         points.push({ x: x, y: yValue });
       }
       current = current.next;
-    }
-    if (sweepY === 120) {
-      console.log("Points at sweepY 120:", points);
     }
     return points;
   }

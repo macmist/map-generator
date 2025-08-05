@@ -3,6 +3,8 @@ import { Arc } from "./definitions/Arc";
 import { Edge } from "./definitions/Edge";
 import { Event } from "./definitions/Event";
 import { Site } from "./definitions/Site";
+import { Vertex } from "./definitions/Vertex";
+import { getCircumcircle, Orientation, orientation } from "./maths/utils";
 import { BeachLine } from "./structures/BeachLine";
 import { EventQueue } from "./structures/EventQueue";
 
@@ -10,15 +12,21 @@ export class VisualFortune {
   private eventQueue: EventQueue = new EventQueue();
   private beachLine: BeachLine = new BeachLine();
   private sweepY: number = 0;
+  public edges: Edge[] = [];
 
   public addSite(site: Site): void {
     const event = new Event(site.x, site.y, site);
     this.eventQueue.insert(event);
   }
 
-  public isOnPoint(y: number): boolean {
+  public onPointOrAfterCircle(y: number): boolean {
     // Check if the sweep line is on a point
-    return this.eventQueue.peek()?.y === y;
+    let event = this.eventQueue.peek();
+    if (!event) return false;
+    if (event.circle) {
+      return event.y >= y && event.valid;
+    }
+    return event.y >= y;
   }
 
   public getPoints(maxX: number, sweepY: number): Point[] {
@@ -29,48 +37,38 @@ export class VisualFortune {
     const event = this.eventQueue.pop();
     this.sweepY = event?.y || 0;
     if (!event) {
-      console.error("No event to process");
       return;
     }
     console.log(`Processing event at (${event.x}, ${event.y})`);
+    this.beachLine.display();
+
     if (event.site) {
-      console.log(`Site event at (${event.site.x}, ${event.site.y})`);
       this.handleSiteEvent(event.site);
       // Handle site event logic here
     }
     if (event.arc) {
-      console.log(
-        `Circle event at (${event.x}, ${event.y}) for arc with site (${event.arc.site.x}, ${event.arc.site.y})`
-      );
       // Handle circle event logic here
+      this.handleCircleEvent(event);
     }
   }
 
   private handleSiteEvent(site: Site): void {
     // Logic to handle site events
-    console.log(`Handling site event for site at (${site.x}, ${site.y})`);
     // Add logic to update the beach line and edges
     const head = this.beachLine.head();
     if (!head) {
-      console.log("No arcs in the beach line, creating new head arc");
       this.beachLine.setHead(new Arc(site));
       return;
     }
     const arcAbove = this.beachLine.findArcAboveX(site.x, this.sweepY);
     if (!arcAbove) {
-      console.error("No arc found above the site, not sure this should happen");
       return;
     }
-    console.log(
-      "arcAbove:",
-      arcAbove.site.x,
-      arcAbove.site.y,
-      arcAbove.prev,
-      arcAbove.next
-    );
+
+    console.log("For point", site, "found arc above:", arcAbove.site);
+
     if (arcAbove.circleEvent) {
       // Remove the circle event if it exists
-      console.log("Removing circle event for arc above site");
       arcAbove.circleEvent.valid = false;
       arcAbove.circleEvent = null;
     }
@@ -79,22 +77,13 @@ export class VisualFortune {
   }
 
   getEdges(sweepY: number): Edge[] {
-    return this.beachLine.getEdges(sweepY);
+    return this.beachLine.getEdges(sweepY).concat(this.edges);
   }
 
   splitArc(arcAbove: Arc, site: Site): void {
-    console.log(
-      "Splitting arc above site at:",
-      arcAbove.site.x,
-      arcAbove.site.y
-    );
-
     const leftArc = new Arc(arcAbove.site);
-    console.log("Creating left arc:", leftArc.site.x, leftArc.site.y);
     const middleArc = new Arc(site);
-    console.log("Creating midle arc:", site.x, site.y);
     const rightArc = new Arc(arcAbove.site);
-    console.log("Creating right arc:", rightArc.site.x, rightArc.site.y);
 
     leftArc.prev = arcAbove.prev;
     leftArc.next = middleArc;
@@ -108,28 +97,125 @@ export class VisualFortune {
     if (leftArc.prev) leftArc.prev.next = leftArc;
     if (rightArc.next) rightArc.next.prev = rightArc;
 
-    console.log("Displaying beach line");
-    let t: Arc | null = leftArc;
-    while (t) {
-      console.log("Arc:", t.site.x, t.site.y);
-      t = t.next;
-    }
-
     if (arcAbove === this.beachLine.head()) {
-      console.log("Setting new head arc in the beach line");
       this.beachLine.setHead(leftArc);
     }
     const y = arcAbove.evaluate(site.x, this.sweepY);
 
     const vertex = [site.x, y];
-    const edgeLeft = new Edge(arcAbove.site, site, vertex[0], vertex[1]);
-    const edgeRight = new Edge(site, arcAbove.site, vertex[0], vertex[1]);
+    const edgeLeft = new Edge(site, arcAbove.site, vertex[0], vertex[1]);
+    const edgeRight = new Edge(arcAbove.site, site, vertex[0], vertex[1]);
     // this.edges.push(edgeLeft, edgeRight);
 
     leftArc.edge = edgeLeft;
     rightArc.edge = edgeRight;
 
-    // this.checkCircleEvents(leftArc);
-    // this.checkCircleEvents(rightArc);
+    this.checkCircleEvents(leftArc);
+    this.checkCircleEvents(rightArc);
+  }
+
+  checkCircleEvents(arc: Arc): void {
+    if (!arc.prev || !arc.next) {
+      return; // Cannot form a circle event without both neighbors
+    }
+    const leftSite = arc.prev.site;
+    const rightSite = arc.next.site;
+
+    const circle = getCircumcircle(leftSite, arc.site, rightSite);
+    if (!circle) {
+      return;
+    }
+
+    if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
+      return; // Not a valid event
+    }
+
+    const eventY = circle.y + circle.r;
+    if (eventY < this.sweepY) {
+      // Create a circle event only if it is above the sweep line
+      return; // Circle event is below the sweep line
+    }
+
+    const event = new Event(circle.x, eventY, null, arc);
+    event.circle = new Site(circle.x, circle.y); // Store the circle center
+    arc.circleEvent = event;
+    this.eventQueue.insert(event);
+  }
+
+  handleCircleEvent(event: Event): void {
+    const arc = event.arc;
+    if (!arc || !event.valid || !event.circle) {
+      console.error("No arc found for circle event");
+      return;
+    }
+
+    console.log(
+      `Handling circle event at (${event.x}, ${event.y}) with arc at (${arc.site.x}, ${arc.site.y})`
+    );
+    const vertex = new Vertex(event.circle?.x, event.circle?.y);
+    if (event.arc && event.arc.edge) {
+      event.arc.edge.vertex = vertex;
+      event.arc.edge.end = [vertex.x, vertex.y];
+      vertex.incidentEdges.push(event.arc.edge);
+      this.edges.push(event.arc.edge);
+    }
+    // this.vertices.push(vertex);
+    const prevArc = arc.prev;
+    const nextArc = arc.next;
+    if (prevArc) {
+      prevArc.next = nextArc;
+    }
+    if (nextArc) {
+      nextArc.prev = prevArc;
+    }
+
+    this.beachLine.rebalance();
+
+    // Invalidate the old circle events
+    if (prevArc?.circleEvent) {
+      prevArc.circleEvent.valid = false;
+      prevArc.circleEvent = null;
+    }
+    if (nextArc?.circleEvent) {
+      nextArc.circleEvent.valid = false;
+      nextArc.circleEvent = null;
+    }
+
+    if (prevArc?.edge) {
+      prevArc.edge.end = [vertex.x, vertex.y];
+      prevArc.edge.vertex = vertex;
+      vertex.incidentEdges.push(prevArc.edge);
+    }
+    if (nextArc?.edge) {
+      nextArc.edge.end = [vertex.x, vertex.y];
+      nextArc.edge.vertex = vertex;
+      vertex.incidentEdges.push(nextArc.edge);
+    }
+    if (prevArc && nextArc) {
+      const edgeLeft = new Edge(prevArc.site, nextArc.site, vertex.x, vertex.y);
+      const edgeRight = new Edge(
+        nextArc.site,
+        prevArc.site,
+        vertex.x,
+        vertex.y
+      );
+
+      //   this.edges.push(edge);
+      edgeLeft.vertex = vertex;
+      edgeRight.vertex = vertex;
+      this.edges.push(edgeLeft, edgeRight);
+      vertex.incidentEdges.push(edgeLeft, edgeRight);
+
+      // Attach this new edge to both neighbors for future circle events
+      prevArc.edge = edgeLeft;
+      nextArc.edge = edgeRight;
+    }
+
+    if (prevArc) {
+      this.checkCircleEvents(prevArc);
+    }
+    if (nextArc) {
+      this.checkCircleEvents(nextArc);
+    }
   }
 }
