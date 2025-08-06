@@ -30,7 +30,7 @@ export class VisualFortune {
   }
 
   public getPoints(maxX: number, sweepY: number): Point[] {
-    return this.beachLine.getPoints(maxX, sweepY);
+    return this.beachLine.getPoints2(maxX, sweepY);
   }
 
   public next() {
@@ -40,7 +40,7 @@ export class VisualFortune {
       return;
     }
     console.log(`Processing event at (${event.x}, ${event.y})`);
-    this.beachLine.display();
+    // this.beachLine.display();
 
     if (event.site) {
       this.handleSiteEvent(event.site);
@@ -114,6 +114,39 @@ export class VisualFortune {
     this.checkCircleEvents(rightArc);
   }
 
+  test(circleY: number, a: Site, b: Site, c: Site): boolean {
+    let aboveArray = [];
+    if (circleY < a.y) {
+      aboveArray.push(a);
+    }
+    if (circleY < b.y) {
+      aboveArray.push(b);
+    }
+    if (circleY < c.y) {
+      aboveArray.push(c);
+    }
+    console.log("This would be ok:", aboveArray.length > 1, aboveArray);
+    return aboveArray.length > 1;
+  }
+
+  rightOnLine(start: Site, end: Site, point: Site): boolean {
+    // Check if the point is on the right side of the line segment
+    return (
+      (end.x - start.x) * (point.y - start.y) -
+        (end.y - start.y) * (point.x - start.x) <=
+      0
+    );
+  }
+
+  convergence(a: Site, b: Site, c: Site, point: Site): boolean {
+    // Check if the point is converging towards the line segment
+
+    if (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y) === 0) {
+      return false; // Points are collinear
+    }
+    return this.rightOnLine(a, b, point) && this.rightOnLine(b, c, point);
+  }
+
   checkCircleEvents(arc: Arc): void {
     if (!arc.prev || !arc.next) {
       return; // Cannot form a circle event without both neighbors
@@ -126,12 +159,32 @@ export class VisualFortune {
       return;
     }
 
-    if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
+    console.log("Circle y: ", circle.y, "r:", circle.r);
+    console.log("Points:", leftSite, arc.site, rightSite);
+
+    // if (!this.test(circle.y, leftSite, arc.site, rightSite)) {
+    //   console.log("ignoring");
+    //   return; // Circle event is below the sweep line
+    // }
+    const circleSite = new Site(circle.x, circle.y);
+
+    if (!this.convergence(leftSite, arc.site, rightSite, circleSite)) {
       return; // Not a valid event
     }
 
-    const eventY = circle.y + circle.r;
-    if (eventY < this.sweepY) {
+    // if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
+    //   console.log(leftSite, arc.site, rightSite);
+    //   console.log(orientation(leftSite, arc.site, rightSite));
+    //   console.error(
+    //     "Sites are not in counter-clockwise order, cannot form circle event"
+    //   );
+    //   return; // Not a valid event
+    // }
+
+    const eventY = circle.y - circle.r;
+
+    if (eventY > this.sweepY) {
+      console.log(`Exiting, ${eventY} is below the sweep line ${this.sweepY}`);
       // Create a circle event only if it is above the sweep line
       return; // Circle event is below the sweep line
     }
@@ -140,6 +193,7 @@ export class VisualFortune {
     event.circle = new Site(circle.x, circle.y); // Store the circle center
     arc.circleEvent = event;
     this.eventQueue.insert(event);
+    console.log("Inserting circle event at", event.x, event.y);
   }
 
   handleCircleEvent(event: Event): void {
@@ -148,10 +202,10 @@ export class VisualFortune {
       console.error("No arc found for circle event");
       return;
     }
-
     console.log(
-      `Handling circle event at (${event.x}, ${event.y}) with arc at (${arc.site.x}, ${arc.site.y})`
+      `Handling circle event for arc at (${arc.site.x}, ${arc.site.y}) with circle at (${event.circle.x}, ${event.circle.y})`
     );
+
     const vertex = new Vertex(event.circle?.x, event.circle?.y);
     if (event.arc && event.arc.edge) {
       event.arc.edge.vertex = vertex;
@@ -191,31 +245,26 @@ export class VisualFortune {
       nextArc.edge.vertex = vertex;
       vertex.incidentEdges.push(nextArc.edge);
     }
+    const head = this.beachLine.head();
+
     if (prevArc && nextArc) {
-      const edgeLeft = new Edge(prevArc.site, nextArc.site, vertex.x, vertex.y);
-      const edgeRight = new Edge(
-        nextArc.site,
-        prevArc.site,
-        vertex.x,
-        vertex.y
-      );
+      const edge = new Edge(prevArc.site, nextArc.site, vertex.x, vertex.y);
 
       //   this.edges.push(edge);
-      edgeLeft.vertex = vertex;
-      edgeRight.vertex = vertex;
-      this.edges.push(edgeLeft, edgeRight);
-      vertex.incidentEdges.push(edgeLeft, edgeRight);
+      edge.vertex = vertex;
+      this.edges.push(edge);
+      vertex.incidentEdges.push(edge);
 
       // Attach this new edge to both neighbors for future circle events
-      prevArc.edge = edgeLeft;
-      nextArc.edge = edgeRight;
+      prevArc.edge = edge;
+      nextArc.edge = edge;
     }
 
-    if (prevArc) {
-      this.checkCircleEvents(prevArc);
-    }
     if (nextArc) {
       this.checkCircleEvents(nextArc);
+    }
+    if (prevArc) {
+      this.checkCircleEvents(prevArc);
     }
   }
 }

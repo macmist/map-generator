@@ -137,6 +137,24 @@ export class FortuneProcessor {
     this.checkCircleEvents(rightArc);
   }
 
+  rightOnLine(start: Site, end: Site, point: Site): boolean {
+    // Check if the point is on the right side of the line segment
+    return (
+      (end.x - start.x) * (point.y - start.y) -
+        (end.y - start.y) * (point.x - start.x) <=
+      0
+    );
+  }
+
+  convergence(a: Site, b: Site, c: Site, point: Site): boolean {
+    // Check if the point is converging towards the line segment
+
+    if (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y) === 0) {
+      return false; // Points are collinear
+    }
+    return this.rightOnLine(a, b, point) && this.rightOnLine(b, c, point);
+  }
+
   checkCircleEvents(arc: Arc): void {
     console.log(
       `Checking circle events for arc at (${arc.site.x}, ${arc.site.y})`
@@ -161,18 +179,14 @@ export class FortuneProcessor {
       "with radius",
       circle.r
     );
+    const circleSite = new Site(circle.x, circle.y);
 
-    if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
-      console.log(leftSite, arc.site, rightSite);
-      console.log(orientation(leftSite, arc.site, rightSite));
-      console.error(
-        "Sites are not in counter-clockwise order, cannot form circle event"
-      );
+    if (!this.convergence(leftSite, arc.site, rightSite, circleSite)) {
       return; // Not a valid event
     }
 
-    const eventY = circle.y + circle.r;
-    if (eventY < this.sweepY) {
+    const eventY = circle.y - circle.r;
+    if (eventY > this.sweepY) {
       console.log(`Exiting, ${eventY} is below the sweep line ${this.sweepY}`);
       // Create a circle event only if it is above the sweep line
       return; // Circle event is below the sweep line

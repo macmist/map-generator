@@ -14,6 +14,7 @@ export class Arc {
     // Calculate the y-coordinate of the arc at a given x-coordinate
     const dp = 2 * (this.site.y - sweepY);
     if (dp === 0) return Infinity;
+
     return (x - this.site.x) ** 2 / dp + (this.site.y + sweepY) / 2;
   }
 }

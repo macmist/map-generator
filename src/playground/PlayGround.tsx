@@ -58,33 +58,33 @@ export const PlayGround = () => {
     visualFortune.addSite(new Site(p.x, p.y));
   });
 
-  // useEffect(() => {
-  //   const fortune = new FortuneProcessor();
+  useEffect(() => {
+    const fortune = new FortuneProcessor();
 
-  //   points.forEach((p) => {
-  //     fortune.addSite({ x: p.x, y: p.y }); // convert y to canvas coordinates
-  //   });
-  //   if (points.length > 0) {
-  //     fortune.computeFortune();
-  //     fortune.bindToBox({
-  //       minX: 0,
-  //       minY: 0,
-  //       maxX: 700,
-  //       maxY: 700,
-  //     });
+    points.forEach((p) => {
+      fortune.addSite(new Site(p.x, p.y)); // convert y to canvas coordinates
+    });
+    if (points.length > 0) {
+      fortune.computeFortune();
+      fortune.bindToBox({
+        minX: 0,
+        minY: 0,
+        maxX: 1100,
+        maxY: 900,
+      });
 
-  //     fortune.vertices.forEach((v) => {
-  //       setVertices((prev) => [...prev, { x: v.x, y: v.y }]);
-  //     });
-  //     fortune.edges.forEach((edge) => {
-  //       const start = { x: edge.start[0], y: edge.start[1] };
-  //       const end = edge.end
-  //         ? { x: edge.end[0], y: edge.end[1] }
-  //         : { x: start.x, y: start.y }; // Handle null end
-  //       setFinishedEdges((prev) => [...prev, { start, end }]);
-  //     });
-  //   }
-  // }, [points, setVertices]);
+      fortune.vertices.forEach((v) => {
+        setVertices((prev) => [...prev, { x: v.x, y: v.y }]);
+      });
+      fortune.edges.forEach((edge) => {
+        const start = { x: edge.start[0], y: edge.start[1] };
+        const end = edge.end
+          ? { x: edge.end[0], y: edge.end[1] }
+          : { x: start.x, y: start.y }; // Handle null end
+        setFinishedEdges((prev) => [...prev, { start, end }]);
+      });
+    }
+  }, [points, setVertices]);
 
   const calculateParabola = (focus: Point, directrix: number): Point[] => {
     const h = focus.x;
@@ -120,7 +120,7 @@ export const PlayGround = () => {
     setVisualPoints([]);
     setFinishedEdges([]);
     setIsSweeping(true);
-    for (let i = 0; i < 502; i++) {
+    for (let i = 0; i < 700; i++) {
       const y = 700 - i; // Invert y for canvas coordinates
       setY(y);
       // console.log("Sweeping at y:", i);
@@ -148,7 +148,11 @@ export const PlayGround = () => {
       } else {
         await timeout(10);
       }
+      if (i === 550) {
+        console.log(visualPoints);
+      }
     }
+
     setIsSweeping(false);
   };
 
@@ -160,6 +164,8 @@ export const PlayGround = () => {
         <Stage
           width={700}
           height={700}
+          scaleX={0.5}
+          scaleY={0.5}
           onClick={(e) => {
             const stage = e.target.getStage();
             stage?.getLayers().forEach((layer) => {
@@ -220,7 +226,7 @@ export const PlayGround = () => {
             {finshedEdges.map((edge, i) => (
               <Line
                 key={i}
-                stroke={"green"}
+                stroke={"orange"}
                 points={[edge.start.x, edge.start.y, edge.end.x, edge.end.y]}
               />
             ))}
