@@ -1,6 +1,6 @@
 import { Container } from "@mui/material";
 import { useEffect, useState } from "react";
-import { Group, Layer, Line, Stage } from "react-konva";
+import { Group, Layer, Line, Stage, Text } from "react-konva";
 import { FortuneProcessor } from "../fortune/fortune";
 import { VisualFortune } from "../fortune/visual-fortune";
 import { Site } from "../fortune/definitions/Site";
@@ -49,14 +49,13 @@ const POINTS: Point[] = [
 export const PlayGround = () => {
   const [x, setX] = useState<number>(0);
   const [y, setY] = useState<number>(0);
+  const [mouseX, setMouseX] = useState<number>(0);
+  const [mouseY, setMouseY] = useState<number>(0);
   const [points, setPoints] = useState<Point[]>(POINTS);
   const [vertices, setVertices] = useState<Point[]>([]);
   const [finshedEdges, setFinishedEdges] = useState<Edge[]>([]);
   const [visualPoints, setVisualPoints] = useState<Point[]>([]);
   const visualFortune = new VisualFortune();
-  points.forEach((p) => {
-    visualFortune.addSite(new Site(p.x, p.y));
-  });
 
   useEffect(() => {
     const fortune = new FortuneProcessor();
@@ -120,19 +119,24 @@ export const PlayGround = () => {
     setVisualPoints([]);
     setFinishedEdges([]);
     setIsSweeping(true);
+    visualFortune.reset();
+    points.forEach((p) => {
+      visualFortune.addSite(new Site(p.x, p.y));
+    });
     for (let i = 0; i < 700; i++) {
       const y = 700 - i; // Invert y for canvas coordinates
       setY(y);
-      // console.log("Sweeping at y:", i);
-      // Simulate a delay for the sweep line effect
 
       while (visualFortune.onPointOrAfterCircle(y)) {
         visualFortune.next();
       }
       setVisualPoints(visualFortune.getPoints(700, y));
       setFinishedEdges([]);
+      setVertices(visualFortune.vertices.map((v) => ({ x: v.x, y: v.y })));
 
-      for (const edge of visualFortune.getEdges(y).filter((e) => e.end)) {
+      for (const edge of visualFortune
+        .getEdges(y)
+        .filter((e) => e.end || e.endVertex)) {
         setFinishedEdges((prev) => [
           ...prev,
           {
@@ -148,13 +152,17 @@ export const PlayGround = () => {
       } else {
         await timeout(10);
       }
-      if (i === 550) {
-        console.log(visualPoints);
+      if (i === 699) {
+        console.log(visualFortune.vertices);
       }
     }
 
     setIsSweeping(false);
   };
+
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [tooltipText, setTooltipText] = useState("");
+  const [isTooltipVisible, setIsTooltipVisible] = useState(false);
 
   return (
     <Container>
@@ -164,43 +172,67 @@ export const PlayGround = () => {
         <Stage
           width={700}
           height={700}
-          scaleX={0.5}
-          scaleY={0.5}
+          // scaleX={0.5}
+          // scaleY={0.5}
           onClick={(e) => {
             const stage = e.target.getStage();
             stage?.getLayers().forEach((layer) => {
-              if (layer.id() === "edges" || layer.id() === "vertices") {
-                console.log("Clearing layer:", layer.id());
+              if (
+                layer.id() !== "points" &&
+                layer.id() !== "tooltip" &&
+                layer.id() !== "line"
+              ) {
                 layer.removeChildren();
               }
             });
-            console.log("Clicked at:", x, y);
-            // points.push({ x, y });
-            // setPoints([...points]);
+            points.push({ x: mouseX, y: mouseY });
+            setFinishedEdges([]);
+            setVertices([]);
+            setPoints([...points]);
+            setVisualPoints([]);
           }}
           onMouseMove={(e) => {
             const stage = e.target.getStage();
             if (stage) {
               const pos = stage.getPointerPosition();
               if (pos) {
-                setX(pos.x);
-                // setY(pos.y);
+                setMouseX(pos.x);
+                setMouseY(pos.y);
+                setTooltipPos({ x: pos.x + 5, y: pos.y + 5 });
+
+                setTooltipText(`${pos.x},${pos.y}`);
+                setIsTooltipVisible(true);
               }
             }
           }}
+          onMouseOut={() => setIsTooltipVisible(false)}
         >
+          <Layer id="tooltip">
+            <Text
+              x={tooltipPos.x}
+              y={tooltipPos.y}
+              text={tooltipText}
+              fontFamily="Calibri"
+              fontSize={12}
+              padding={5}
+              textFill="white"
+              fill="black"
+              alpha={0.75}
+              visible={isTooltipVisible}
+            />
+          </Layer>
           <Layer id="points">
             {points.map((p, i) => (
               <PointComponent key={i} x={p.x} y={p.y} />
             ))}
           </Layer>
           <Layer id="vertices">
-            {/* {vertices.map((p, i) => (
+            {vertices.map((p, i) => (
               <PointComponent key={i} x={p.x} y={p.y} color="red" />
-            ))} */}
+            ))}
           </Layer>
           <Layer>
-            {points.map((p, i) => {
+            {/* {points.map((p, i) => {
               if (y <= p.y)
                 return (
                   <Line
@@ -210,7 +242,7 @@ export const PlayGround = () => {
                   />
                 );
               return <></>;
-            })}
+            })} */}
 
             {visualPoints.length > 0 && (
               <Line
@@ -219,8 +251,8 @@ export const PlayGround = () => {
               />
             )}
           </Layer>
-          <Layer>
-            <Line x={0} y={y} stroke={"red"} points={[0, 0, 1000, 0]} />
+          <Layer id="line">
+            <Line y={y} stroke={"red"} points={[0, 0, 1000, 0]} />
           </Layer>
           <Layer id="edges">
             {finshedEdges.map((edge, i) => (

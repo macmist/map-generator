@@ -32,6 +32,10 @@ export class EventQueue {
 
   peek(): Event | undefined {
     const element = this.events[0];
+    if (element && !element.valid) {
+      this.events.shift();
+      return this.peek();
+    }
     return element;
   }
 

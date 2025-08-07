@@ -34,7 +34,11 @@ export class BeachLine {
     const edges: Edge[] = [];
     let current: Arc | null = this.root;
     while (current) {
-      if (current.edge) {
+      if (
+        current.edge &&
+        current.edge.end === null &&
+        current.edge.endVertex === null
+      ) {
         const nextX = findIntersection(
           current.edge.leftSite,
           current.edge.rightSite,
@@ -83,16 +87,9 @@ export class BeachLine {
 
   getPoints2(maxX: number, sweepY: number): Point[] {
     const points: Point[] = [];
-    let current: Arc | null = null;
     for (let x = 0; x < maxX; x++) {
       let above = this.findArcAboveX(x, sweepY);
-      if (above !== current && sweepY === 700 - 550) {
-        console.log(
-          `Arc above x=${x}:`,
-          above ? `${above.site.x}, ${above.site.y}` : "None"
-        );
-        current = above;
-      }
+
       if (!above) continue; // No arc above this x-coordinate
       const yValue = above.evaluate(x, sweepY);
       if (yValue === Infinity) continue; // Skip points that are not defined
@@ -110,11 +107,6 @@ export class BeachLine {
       if (current.next) {
         const [first, second] = [current.site, current.next.site];
         nextX = findIntersection(first, second, sweepY);
-        if (sweepY === 700 - 550) {
-          console.log(
-            `Next X for arc at (${current.site.x}, ${current.site.y}) is ${nextX}`
-          );
-        }
       }
 
       for (x; x <= Math.floor(nextX); x++) {

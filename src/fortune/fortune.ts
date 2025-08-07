@@ -185,11 +185,12 @@ export class FortuneProcessor {
       return; // Not a valid event
     }
 
+    // We store the lowest location of the circle
     const eventY = circle.y - circle.r;
+    // If the eventY is above the sweep line, we ignore it
     if (eventY > this.sweepY) {
-      console.log(`Exiting, ${eventY} is below the sweep line ${this.sweepY}`);
-      // Create a circle event only if it is above the sweep line
-      return; // Circle event is below the sweep line
+      console.log(`Exiting, ${eventY} is above the sweep line ${this.sweepY}`);
+      return; // Circle event is above the sweep line
     }
 
     const event = new Event(circle.x, eventY, null, arc);

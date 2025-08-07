@@ -52,6 +52,11 @@ export function findIntersection(
   const x2 = (-b - s) / (2 * a);
   // Return the x-coordinate of the intersection point
   const res = p.y < r.y ? Math.max(x1, x2) : Math.min(x1, x2);
+  if (y === 480) {
+    console.log(
+      `Intersection at y=${y} between (${p.x}, ${p.y}) and (${r.x}, ${r.y}) is at x1=${x1}, x2=${x2}, returning ${res}`
+    );
+  }
   return res;
 }
 

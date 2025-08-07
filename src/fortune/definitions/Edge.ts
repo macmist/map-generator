@@ -7,6 +7,7 @@ export class Edge {
   public end: [number, number] | null = null;
   public direction: [number, number];
   public vertex: Vertex | null = null;
+  public endVertex: Vertex | null = null;
 
   constructor(
     public leftSite: Site,
