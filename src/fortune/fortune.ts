@@ -1,3 +1,4 @@
+import { Point } from "../playground/PlayGround";
 import { Arc } from "./definitions/Arc";
 import { Edge } from "./definitions/Edge";
 import { Event } from "./definitions/Event";
@@ -30,9 +31,55 @@ export class FortuneProcessor {
     this.beachLine = new BeachLine();
     this.eventQueue = new EventQueue();
   }
+
+  public reset(): void {
+    this.eventQueue = new EventQueue();
+    this.beachLine = new BeachLine();
+    this.sweepY = 0;
+    this.edges = [];
+    this.vertices = [];
+  }
+
   addSite(site: Site): void {
     const event = new Event(site.x, site.y, site);
     this.eventQueue.insert(event);
+  }
+
+  public onPointOrAfterCircle(y: number): boolean {
+    // Check if the sweep line is on a point
+    let event = this.eventQueue.peek();
+    if (!event) return false;
+    if (event.circle) {
+      return event.y >= y && event.valid;
+    }
+    return event.y >= y;
+  }
+
+  getEdges(sweepY: number): Edge[] {
+    return this.beachLine.getEdges(sweepY).concat(this.edges);
+  }
+
+  public next() {
+    const event = this.eventQueue.pop();
+    this.sweepY = event?.y || 0;
+    if (!event) {
+      return;
+    }
+    console.log(`Processing event at (${event.x}, ${event.y})`);
+    // this.beachLine.display();
+
+    if (event.site) {
+      this.handleSiteEvent(event.site);
+      // Handle site event logic here
+    }
+    if (event.arc) {
+      // Handle circle event logic here
+      this.handleCircleEvent(event);
+    }
+  }
+
+  public getPoints(maxX: number, sweepY: number): Point[] {
+    return this.beachLine.getPoints(maxX, sweepY);
   }
 
   computeFortune(): void {

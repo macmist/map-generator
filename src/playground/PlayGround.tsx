@@ -2,7 +2,6 @@ import { Container } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Group, Layer, Line, Stage, Text } from "react-konva";
 import { FortuneProcessor } from "../fortune/fortune";
-import { VisualFortune } from "../fortune/visual-fortune";
 import { Site } from "../fortune/definitions/Site";
 
 export type Point = {
@@ -55,7 +54,7 @@ export const PlayGround = () => {
   const [vertices, setVertices] = useState<Point[]>([]);
   const [finshedEdges, setFinishedEdges] = useState<Edge[]>([]);
   const [visualPoints, setVisualPoints] = useState<Point[]>([]);
-  const visualFortune = new VisualFortune();
+  const visualFortune = new FortuneProcessor();
 
   useEffect(() => {
     const fortune = new FortuneProcessor();
