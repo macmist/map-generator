@@ -1,4 +1,5 @@
 import { Event } from "../definitions/Event";
+import { Site } from "../definitions/Site";
 import {
   compareEvents,
   findIntersection,
@@ -38,24 +39,24 @@ describe("Compare Events", () => {
 
 describe("Find Intersection", () => {
   it("should find intersection for two sites at different heights", () => {
-    const site1 = { x: 1, y: 2 };
-    const site2 = { x: 3, y: 4 };
+    const site1 = new Site(1, 2);
+    const site2 = new Site(3, 4);
     const y = 3;
 
     expect(findIntersection(site1, site2, y)).toBeCloseTo(2); // Linear interpolation
   });
 
   it("should return midpoint for two sites at the same height", () => {
-    const site1 = { x: 1, y: 2 };
-    const site2 = { x: 3, y: 2 };
+    const site1 = new Site(1, 2);
+    const site2 = new Site(3, 2);
     const y = 2;
 
     expect(findIntersection(site1, site2, y)).toBe(2); // Midpoint
   });
 
   it("should handle vertical alignment", () => {
-    const site1 = { x: 5, y: 0 };
-    const site2 = { x: 5, y: 10 };
+    const site1 = new Site(5, 0);
+    const site2 = new Site(5, 10);
     const y = 5;
     expect(findIntersection(site1, site2, y)).toBe(5); // Same x value
   });
@@ -63,32 +64,32 @@ describe("Find Intersection", () => {
 
 describe("Orientation", () => {
   it("should return COLLINEAR for collinear points", () => {
-    const p = { x: 0, y: 0 };
-    const q = { x: 1, y: 1 };
-    const r = { x: 2, y: 2 };
+    const p = new Site(0, 0);
+    const q = new Site(1, 1);
+    const r = new Site(2, 2);
     expect(orientation(p, q, r)).toBe(Orientation.COLLINEAR);
   });
 
   it("should return CLOCKWISE for clockwise orientation", () => {
-    const p = { x: 0, y: 0 };
-    const q = { x: 1, y: 2 };
-    const r = { x: 4, y: 4 };
+    const p = new Site(0, 0);
+    const q = new Site(1, 2);
+    const r = new Site(4, 4);
     expect(orientation(p, q, r)).toBe(Orientation.CLOCKWISE);
   });
 
   it("should return COUNTERCLOCKWISE for counterclockwise orientation", () => {
-    const p = { x: 0, y: 0 };
-    const q = { x: 4, y: 4 };
-    const r = { x: 1, y: 2 };
+    const p = new Site(0, 0);
+    const q = new Site(4, 4);
+    const r = new Site(1, 2);
     expect(orientation(p, q, r)).toBe(Orientation.COUNTERCLOCKWISE);
   });
 });
 
 describe("Get Circumcircle", () => {
   it("should return the circumcircle for three points", () => {
-    const a = { x: 0, y: 0 };
-    const b = { x: 4, y: 0 };
-    const c = { x: 2, y: 4 };
+    const a = new Site(0, 0);
+    const b = new Site(4, 0);
+    const c = new Site(2, 4);
 
     const circumcircle = getCircumcircle(a, b, c);
     expect(circumcircle).toBeDefined();

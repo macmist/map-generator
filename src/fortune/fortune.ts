@@ -1,6 +1,8 @@
+import { Point } from "../playground/PlayGround";
 import { Arc } from "./definitions/Arc";
 import { Edge } from "./definitions/Edge";
 import { Event } from "./definitions/Event";
+import { Face } from "./definitions/Face";
 import { Site } from "./definitions/Site";
 import { Vertex } from "./definitions/Vertex";
 import {
@@ -25,14 +27,63 @@ export class FortuneProcessor {
   private eventQueue: EventQueue = new EventQueue();
   public edges: Edge[] = [];
   public vertices: Vertex[] = [];
+  public faces: Map<Site, Face> = new Map(); // Store faces by their site ID
 
   constructor() {
     this.beachLine = new BeachLine();
     this.eventQueue = new EventQueue();
   }
+
+  public reset(): void {
+    this.eventQueue = new EventQueue();
+    this.beachLine = new BeachLine();
+    this.sweepY = 0;
+    this.edges = [];
+    this.vertices = [];
+  }
+
   addSite(site: Site): void {
     const event = new Event(site.x, site.y, site);
+    const face = new Face(site);
+    this.faces.set(site, face); // Store the face for this site
     this.eventQueue.insert(event);
+  }
+
+  public onPointOrAfterCircle(y: number): boolean {
+    // Check if the sweep line is on a point
+    let event = this.eventQueue.peek();
+    if (!event) return false;
+    if (event.circle) {
+      return event.y >= y && event.valid;
+    }
+    return event.y >= y;
+  }
+
+  getEdges(sweepY: number): Edge[] {
+    return this.beachLine.getEdges(sweepY).concat(this.edges);
+  }
+
+  public next() {
+    const event = this.eventQueue.pop();
+    this.sweepY = event?.y || 0;
+    if (!event) {
+      return;
+    }
+    console.log(`Processing event at (${event.x}, ${event.y})`);
+    // this.beachLine.display();
+
+    if (event.site) {
+      this.handleSiteEvent(event.site);
+      // Handle site event logic here
+    }
+    if (event.arc) {
+      // Handle circle event logic here
+      this.handleCircleEvent(event);
+    }
+  }
+
+  public getPoints(maxX: number, sweepY: number): Point[] {
+    return this.beachLine.getPoints(maxX, sweepY);
   }
 
   computeFortune(): void {
@@ -86,19 +137,34 @@ export class FortuneProcessor {
     this.splitArc(arcAbove, site);
   }
 
-  splitArc(arcAbove: Arc, site: Site): void {
-    console.log(
-      "Splitting arc above site at:",
-      arcAbove.site.x,
-      arcAbove.site.y
-    );
+  linkFaces(): void {
+    // Link faces based on edges
+    this.faces.forEach((face) => {
+      face.incidentEdges.forEach((edge) => {
+        if (edge.leftSite && edge.rightSite) {
+          const leftFace = this.faces.get(edge.leftSite);
+          const rightFace = this.faces.get(edge.rightSite);
+          if (leftFace) {
+            if (leftFace.site !== face.site) {
+              leftFace.neighbors.add(face);
+              face.neighbors.add(leftFace);
+            }
+          }
+          if (rightFace) {
+            if (rightFace.site !== face.site) {
+              rightFace.neighbors.add(face);
+              face.neighbors.add(rightFace);
+            }
+          }
+        }
+      });
+    });
+  }
 
+  splitArc(arcAbove: Arc, site: Site): void {
     const leftArc = new Arc(arcAbove.site);
-    console.log("Creating left arc:", leftArc.site.x, leftArc.site.y);
     const middleArc = new Arc(site);
-    console.log("Creating midle arc:", site.x, site.y);
     const rightArc = new Arc(arcAbove.site);
-    console.log("Creating right arc:", rightArc.site.x, rightArc.site.y);
 
     leftArc.prev = arcAbove.prev;
     leftArc.next = middleArc;
@@ -112,45 +178,46 @@ export class FortuneProcessor {
     if (leftArc.prev) leftArc.prev.next = leftArc;
     if (rightArc.next) rightArc.next.prev = rightArc;
 
-    console.log("Displaying beach line");
-    let t: Arc | null = leftArc;
-    while (t) {
-      console.log("Arc:", t.site.x, t.site.y);
-      t = t.next;
-    }
-
     if (arcAbove === this.beachLine.head()) {
-      console.log("Setting new head arc in the beach line");
       this.beachLine.setHead(leftArc);
     }
+    const y = arcAbove.evaluate(site.x, this.sweepY);
 
-    const vertex = [site.x, this.sweepY];
+    const vertex = [site.x, y];
+    const siteFace = this.faces.get(site);
+    const arcAboveFace = this.faces.get(arcAbove.site);
     const edgeLeft = new Edge(arcAbove.site, site, vertex[0], vertex[1]);
     const edgeRight = new Edge(site, arcAbove.site, vertex[0], vertex[1]);
+    if (arcAbove.leftEdge) {
+      leftArc.leftEdge = arcAbove.leftEdge;
+    }
+    if (arcAbove.rightEdge) {
+      rightArc.rightEdge = arcAbove.rightEdge;
+    }
     this.edges.push(edgeLeft, edgeRight);
+    siteFace?.incidentEdges.push(edgeLeft, edgeRight);
+    arcAboveFace?.incidentEdges.push(edgeLeft, edgeRight);
 
-    leftArc.edge = edgeLeft;
-    rightArc.edge = edgeRight;
+    leftArc.rightEdge = edgeLeft;
+    rightArc.leftEdge = edgeRight;
 
     this.checkCircleEvents(leftArc);
     this.checkCircleEvents(rightArc);
   }
 
   checkCircleEvents(arc: Arc): void {
-    console.log(
-      `Checking circle events for arc at (${arc.site.x}, ${arc.site.y})`
-    );
     if (!arc.prev || !arc.next) {
-      console.error("Cannot check circle event without both neighbors");
       return; // Cannot form a circle event without both neighbors
     }
     const leftSite = arc.prev.site;
     const rightSite = arc.next.site;
 
-    if (
-      orientation(leftSite, arc.site, rightSite) !==
-      Orientation.COUNTERCLOCKWISE
-    ) {
+    const circle = getCircumcircle(leftSite, arc.site, rightSite);
+    if (!circle) {
+      return;
+    }
+
+    if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
       console.log(leftSite, arc.site, rightSite);
       console.log(orientation(leftSite, arc.site, rightSite));
       console.error(
@@ -159,33 +226,45 @@ export class FortuneProcessor {
       return; // Not a valid event
     }
 
-    const circle = getCircumcircle(leftSite, arc.site, rightSite);
-    if (!circle) {
-      console.error("No circumcircle found for the arc");
-      return;
-    }
+    const eventY = circle.y - circle.r;
 
-    const eventY = circle.y + circle.r;
-    if (eventY < this.sweepY) {
-      console.log(`Exiting, ${eventY} is below the sweep line ${this.sweepY}`);
+    if (eventY > this.sweepY) {
       // Create a circle event only if it is above the sweep line
       return; // Circle event is below the sweep line
     }
 
     const event = new Event(circle.x, eventY, null, arc);
-    console.log("inserting circle event at", event.x, event.y);
+    event.circle = new Site(circle.x, circle.y); // Store the circle center
     arc.circleEvent = event;
+    console.log("inserting circle event at", event.x, event.y);
     this.eventQueue.insert(event);
   }
 
   handleCircleEvent(event: Event): void {
     const arc = event.arc;
-    if (!arc || !event.valid) {
-      console.error("No arc found for circle event");
+    if (!arc || !event.valid || !event.circle) {
       return;
     }
 
-    const vertex = new Vertex(event.x, event.y);
+    const vertex = new Vertex(event.circle?.x, event.circle?.y);
+    if (event.arc && event.arc.leftEdge) {
+      event.arc.leftEdge.endVertex = vertex;
+      event.arc.leftEdge.end = [vertex.x, vertex.y];
+      vertex.incidentEdges.push(event.arc.leftEdge);
+      const leftFace = this.faces.get(event.arc.leftEdge.leftSite);
+      leftFace?.corners.add(vertex);
+      const rightFace = this.faces.get(event.arc.leftEdge.rightSite);
+      rightFace?.corners.add(vertex);
+    }
+    if (event.arc && event.arc.rightEdge) {
+      event.arc.rightEdge.endVertex = vertex;
+      event.arc.rightEdge.end = [vertex.x, vertex.y];
+      vertex.incidentEdges.push(event.arc.rightEdge);
+      const leftFace = this.faces.get(event.arc.rightEdge.leftSite);
+      leftFace?.corners.add(vertex);
+      const rightFace = this.faces.get(event.arc.rightEdge.rightSite);
+      rightFace?.corners.add(vertex);
+    }
     this.vertices.push(vertex);
 
     const prevArc = arc.prev;
@@ -196,6 +275,7 @@ export class FortuneProcessor {
     if (nextArc) {
       nextArc.prev = prevArc;
     }
+    this.beachLine.rebalance();
 
     // Invalidate the old circle events
     if (prevArc?.circleEvent) {
@@ -207,25 +287,37 @@ export class FortuneProcessor {
       nextArc.circleEvent = null;
     }
 
-    if (prevArc?.edge) {
-      prevArc.edge.end = [vertex.x, vertex.y];
-      prevArc.edge.vertex = vertex;
-      vertex.incidentEdges.push(prevArc.edge);
+    if (prevArc?.rightEdge) {
+      prevArc.rightEdge.end = [vertex.x, vertex.y];
+      prevArc.rightEdge.endVertex = vertex;
+      vertex.incidentEdges.push(prevArc.rightEdge);
     }
-    if (nextArc?.edge) {
-      nextArc.edge.end = [vertex.x, vertex.y];
-      nextArc.edge.vertex = vertex;
-      vertex.incidentEdges.push(nextArc.edge);
+    if (nextArc?.leftEdge) {
+      nextArc.leftEdge.end = [vertex.x, vertex.y];
+      nextArc.leftEdge.endVertex = vertex;
+      vertex.incidentEdges.push(nextArc.leftEdge);
     }
     if (prevArc && nextArc) {
-      const edge = new Edge(prevArc.site, nextArc.site, vertex.x, vertex.y);
-      this.edges.push(edge);
-      edge.vertex = vertex;
-      vertex.incidentEdges.push(edge);
-
+      const rightEdge = new Edge(
+        prevArc.site,
+        nextArc.site,
+        vertex.x,
+        vertex.y
+      );
+      const leftEdge = new Edge(prevArc.site, nextArc.site, vertex.x, vertex.y);
+      this.edges.push(rightEdge, leftEdge);
+      rightEdge.vertex = vertex;
+      leftEdge.vertex = vertex;
+      vertex.incidentEdges.push(rightEdge, leftEdge);
       // Attach this new edge to both neighbors for future circle events
-      prevArc.edge = edge;
-      nextArc.edge = edge;
+      prevArc.rightEdge = rightEdge;
+      nextArc.leftEdge = leftEdge;
+      const siteFace = this.faces.get(prevArc.site);
+      const nextArcFace = this.faces.get(nextArc.site);
+      siteFace?.incidentEdges.push(rightEdge, leftEdge);
+      siteFace?.corners.add(vertex);
+      nextArcFace?.incidentEdges.push(leftEdge, rightEdge);
+      nextArcFace?.corners.add(vertex);
     }
 
     if (prevArc) {

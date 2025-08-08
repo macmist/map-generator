@@ -9,7 +9,12 @@ export function compareEvents(a: Event, b: Event): number {
   return a.x - b.x; // left comes first
 }
 
-export function findIntersection(p: Site, r: Site, y: number): number {
+export function findIntersection(
+  p: Site,
+  r: Site,
+  y: number,
+  x?: number
+): number {
   // Calculate the x-coordinate of the intersection of the two sites at a given y
   if (p.y === r.y) {
     return (p.x + r.x) / 2; // If they are at the same height, return the midpoint
@@ -29,6 +34,7 @@ export function findIntersection(p: Site, r: Site, y: number): number {
     (p.x ** 2 + p.y ** 2 - y ** 2) / dp - (r.x ** 2 + r.y ** 2 - y ** 2) / dr;
 
   if (Math.abs(a) < 1e-10) {
+    console.log("Linear case, no intersection found");
     return -c / b;
   }
 
@@ -37,15 +43,21 @@ export function findIntersection(p: Site, r: Site, y: number): number {
 
   if (delta < 0) {
     // Parabolas don’t intersect — return middle point
+    console.log("No intersection found, returning midpoint");
     return (p.x + r.x) / 2;
   }
 
   const s = Math.sqrt(delta);
   const x1 = (-b + s) / (2 * a);
   const x2 = (-b - s) / (2 * a);
-
   // Return the x-coordinate of the intersection point
-  return p.y > r.y ? Math.max(x1, x2) : Math.min(x1, x2);
+  const res = p.y < r.y ? Math.max(x1, x2) : Math.min(x1, x2);
+  if (y === 480) {
+    console.log(
+      `Intersection at y=${y} between (${p.x}, ${p.y}) and (${r.x}, ${r.y}) is at x1=${x1}, x2=${x2}, returning ${res}`
+    );
+  }
+  return res;
 }
 
 export enum Orientation {
@@ -53,6 +65,13 @@ export enum Orientation {
   CLOCKWISE = 1,
   COUNTERCLOCKWISE = 2,
 }
+
+export const calculateAngle = (p: Site, center: Site): number => {
+  const dx = p.x - center.x;
+  const dy = p.y - center.y;
+  const angle = Math.atan2(dy, dx); // Angle in radians
+  return angle < 0 ? angle + 2 * Math.PI : angle; // Normalize
+};
 
 export const orientation = (p: Site, q: Site, r: Site): Orientation => {
   const val = (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);

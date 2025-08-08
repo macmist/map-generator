@@ -3,6 +3,7 @@ import { Site } from "./Site";
 
 export class Event {
   public valid: boolean = true;
+  public circle: Site | null = null; // circle event center
 
   constructor(
     public x: number,
