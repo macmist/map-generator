@@ -1,8 +1,9 @@
 import { Container } from "@mui/material";
-import { useEffect, useState } from "react";
-import { Group, Layer, Line, Stage, Text } from "react-konva";
+import { useCallback, useEffect, useState } from "react";
+import { Group, Layer, Line, Stage } from "react-konva";
 import { FortuneProcessor } from "../fortune/fortune";
 import { Site } from "../fortune/definitions/Site";
+import { Face } from "../fortune/definitions/Face";
 
 export type Point = {
   x: number;
@@ -45,20 +46,36 @@ const POINTS: Point[] = [
   { x: 250, y: 550 },
 ];
 
+const generateRandomPoints = (count: number): Point[] => {
+  const points: Point[] = [];
+  for (let i = 0; i < count; i++) {
+    points.push({
+      x: Math.random() * 700,
+      y: Math.random() * 700,
+    });
+  }
+  return points;
+};
+
 export const PlayGround = () => {
-  const [x, setX] = useState<number>(0);
-  const [y, setY] = useState<number>(0);
-  const [mouseX, setMouseX] = useState<number>(0);
-  const [mouseY, setMouseY] = useState<number>(0);
   const [points, setPoints] = useState<Point[]>(POINTS);
   const [vertices, setVertices] = useState<Point[]>([]);
   const [finshedEdges, setFinishedEdges] = useState<Edge[]>([]);
-  const [visualPoints, setVisualPoints] = useState<Point[]>([]);
-  const visualFortune = new FortuneProcessor();
+  const [faces, setFaces] = useState<Face[]>([]);
+  const fortune = new FortuneProcessor();
+
+  const cleanUp = useCallback(() => {
+    setPoints([]);
+    setFinishedEdges([]);
+    setVertices([]);
+    setFaces([]);
+  }, []);
 
   useEffect(() => {
-    const fortune = new FortuneProcessor();
-
+    fortune.reset();
+    setFinishedEdges([]);
+    setVertices([]);
+    setFaces([]);
     points.forEach((p) => {
       fortune.addSite(new Site(p.x, p.y)); // convert y to canvas coordinates
     });
@@ -67,8 +84,8 @@ export const PlayGround = () => {
       fortune.bindToBox({
         minX: 0,
         minY: 0,
-        maxX: 1100,
-        maxY: 900,
+        maxX: 700,
+        maxY: 700,
       });
 
       fortune.vertices.forEach((v) => {
@@ -83,145 +100,41 @@ export const PlayGround = () => {
       });
       fortune.linkFaces();
       console.log(fortune.faces);
+      fortune.randomizeColors();
+      const faces = Array.from(fortune.faces.values());
+      setFaces(faces);
     }
-  }, [points, setVertices]);
-
-  const calculateParabola = (focus: Point, directrix: number): Point[] => {
-    const h = focus.x;
-    const k = (focus.y + directrix) / 2;
-    const p = Math.abs(directrix - focus.y) / 2;
-    const res: Point[] = [];
-
-    if (p !== 0) {
-      for (let x = 0; x < 700; x++) {
-        const y = (x - h) ** 2 / (4 * p) + k;
-        res.push({ x, y });
-      }
-      return res;
-    }
-
-    return res;
-  };
-
-  const timeout = (delay: number) => {
-    return new Promise((res) => setTimeout(res, delay));
-  };
-
-  useEffect(() => {
-    // console.log("Visual points updated:", visualPoints);
-  }, [visualPoints]);
-
-  useEffect(() => {
-    // console.log("Visual points updated:", visualPoints);
-  }, [finshedEdges]);
-
-  const [isSweeping, setIsSweeping] = useState(false);
-  const sweep = async () => {
-    setVisualPoints([]);
-    setFinishedEdges([]);
-    setIsSweeping(true);
-    visualFortune.reset();
-    points.forEach((p) => {
-      visualFortune.addSite(new Site(p.x, p.y));
-    });
-    for (let i = 0; i < 700; i++) {
-      const y = 700 - i; // Invert y for canvas coordinates
-      setY(y);
-
-      while (visualFortune.onPointOrAfterCircle(y)) {
-        visualFortune.next();
-      }
-      setVisualPoints(visualFortune.getPoints(700, y));
-      setFinishedEdges([]);
-      setVertices(visualFortune.vertices.map((v) => ({ x: v.x, y: v.y })));
-
-      for (const edge of visualFortune
-        .getEdges(y)
-        .filter((e) => e.end || e.endVertex)) {
-        setFinishedEdges((prev) => [
-          ...prev,
-          {
-            start: { x: edge.start[0], y: edge.start[1] },
-            end: edge.end
-              ? { x: edge.end[0], y: edge.end[1] }
-              : { x: edge.start[0], y: edge.start[1] },
-          },
-        ]);
-      }
-      if (i > 350) {
-        await timeout(10);
-      } else {
-        await timeout(10);
-      }
-      if (i === 699) {
-        console.log(visualFortune.vertices);
-      }
-    }
-
-    setIsSweeping(false);
-  };
-
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const [tooltipText, setTooltipText] = useState("");
-  const [isTooltipVisible, setIsTooltipVisible] = useState(false);
+  }, [points]);
 
   return (
     <Container>
       <h1>PlayGround</h1>
-      <button onClick={() => sweep()}>start</button>
       <div style={{ width: 700, height: 700, border: "1px solid black" }}>
-        <Stage
-          width={700}
-          height={700}
-          // scaleX={0.5}
-          // scaleY={0.5}
-          onClick={(e) => {
-            const stage = e.target.getStage();
-            stage?.getLayers().forEach((layer) => {
-              if (
-                layer.id() !== "points" &&
-                layer.id() !== "tooltip" &&
-                layer.id() !== "line"
-              ) {
-                layer.removeChildren();
-              }
-            });
-            points.push({ x: mouseX, y: mouseY });
-            setFinishedEdges([]);
-            setVertices([]);
-            setPoints([...points]);
-            setVisualPoints([]);
+        <button onClick={() => cleanUp()}>Reset</button>
+        <button
+          onClick={() => {
+            const randomPoints = generateRandomPoints(100);
+            setPoints(randomPoints);
           }}
-          onMouseMove={(e) => {
-            const stage = e.target.getStage();
-            if (stage) {
-              const pos = stage.getPointerPosition();
-              if (pos) {
-                setMouseX(pos.x);
-                setMouseY(pos.y);
-                setTooltipPos({ x: pos.x + 5, y: pos.y + 5 });
-
-                setTooltipText(`${pos.x},${pos.y}`);
-                setIsTooltipVisible(true);
-              }
-            }
-          }}
-          onMouseOut={() => setIsTooltipVisible(false)}
         >
-          <Layer id="tooltip">
-            <Text
-              x={tooltipPos.x}
-              y={tooltipPos.y}
-              text={tooltipText}
-              fontFamily="Calibri"
-              fontSize={12}
-              padding={5}
-              textFill="white"
-              fill="black"
-              alpha={0.75}
-              visible={isTooltipVisible}
-            />
+          Generate points
+        </button>
+        <Stage width={700} height={700}>
+          <Layer id="faces" clearBeforeDraw={true}>
+            {faces.map((face, i) => {
+              const points = face.asPolygon().flatMap((p) => [p[0], p[1]]);
+              console.log("Face points:", points, face.color);
+              return (
+                <Line
+                  key={i}
+                  fill={face.color || "lightblue"}
+                  closed
+                  points={points}
+                />
+              );
+            })}
           </Layer>
+
           <Layer id="points">
             {points.map((p, i) => (
               <PointComponent key={i} x={p.x} y={p.y} />
@@ -232,30 +145,8 @@ export const PlayGround = () => {
               <PointComponent key={i} x={p.x} y={p.y} color="red" />
             ))}
           </Layer>
-          <Layer>
-            {/* {points.map((p, i) => {
-              if (y <= p.y)
-                return (
-                  <Line
-                    key={i}
-                    stroke={"green"}
-                    points={calculateParabola(p, y).flatMap((p) => [p.x, p.y])}
-                  />
-                );
-              return <></>;
-            })} */}
 
-            {visualPoints.length > 0 && (
-              <Line
-                stroke={"blue"}
-                points={visualPoints.flatMap((p) => [p.x, p.y])}
-              />
-            )}
-          </Layer>
-          <Layer id="line">
-            <Line y={y} stroke={"red"} points={[0, 0, 1000, 0]} />
-          </Layer>
-          <Layer id="edges">
+          <Layer id="edges" clearBeforeDraw={true}>
             {finshedEdges.map((edge, i) => (
               <Line
                 key={i}

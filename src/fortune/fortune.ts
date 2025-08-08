@@ -40,6 +40,7 @@ export class FortuneProcessor {
     this.sweepY = 0;
     this.edges = [];
     this.vertices = [];
+    this.faces.clear(); // Clear the faces map
   }
 
   addSite(site: Site): void {
@@ -328,12 +329,62 @@ export class FortuneProcessor {
     }
   }
 
+  randomizeColors(): void {
+    this.faces.forEach((face) => {
+      face.color = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
+    });
+  }
+
+  addCornersToFaces(bbox: BoundingBox): void {
+    const corners = [
+      new Vertex(bbox.minX, bbox.minY), // bottom-left (0, 0)
+      new Vertex(bbox.minX, bbox.maxY), // top-left (0, 700)
+      new Vertex(bbox.maxX, bbox.minY), // bottom-right (700, 0)
+      new Vertex(bbox.maxX, bbox.maxY), // top-right (700, 700)
+    ];
+    for (const corner of corners) {
+      let closestFace: Face | null = null;
+      let minDist = Infinity;
+
+      this.faces.forEach((face: Face) => {
+        const dx = corner.x - face.site.x;
+        const dy = corner.y - face.site.y;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < minDist) {
+          minDist = distSq;
+          closestFace = face as Face;
+        }
+      });
+
+      if (closestFace !== null) {
+        console.log(
+          `Adding corner (${corner.x}, ${corner.y}) to face at (${
+            (closestFace as Face).site.x
+          }, ${(closestFace as Face).site.y})`
+        );
+        (closestFace as Face).corners.add(corner);
+      }
+    }
+  }
+
   bindToBox(box: BoundingBox): void {
+    this.addCornersToFaces(box);
+    this.bindStart(box);
     for (const edge of this.edges) {
       if (!edge.end) {
         const clipped = this.clipEdgeToBox(edge, box);
         if (clipped) {
           edge.end = clipped;
+          edge.endVertex = new Vertex(clipped[0], clipped[1]);
+          let face = this.faces.get(edge.leftSite);
+          if (face) {
+            face.corners.add(edge.endVertex);
+          }
+          let rightFace = this.faces.get(edge.rightSite);
+          if (rightFace) {
+            rightFace.corners.add(edge.endVertex);
+          }
         } else {
           // Optionally: remove the edge if it doesn’t intersect the box
           console.warn("Edge did not intersect bounding box", edge);
@@ -394,5 +445,83 @@ export class FortuneProcessor {
     });
 
     return candidates[0];
+  }
+
+  lineIntersection(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    x3: number,
+    y3: number,
+    x4: number,
+    y4: number
+  ): [number, number] | null {
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (denom === 0) return null; // Parallel
+
+    const px =
+      ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) /
+      denom;
+    const py =
+      ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) /
+      denom;
+
+    // Check if intersection is within both segments
+    const within = (min: number, max: number, v: number) =>
+      v >= Math.min(min, max) && v <= Math.max(min, max);
+    if (
+      within(x1, x2, px) &&
+      within(y1, y2, py) &&
+      within(x3, x4, px) &&
+      within(y3, y4, py)
+    ) {
+      return [px, py];
+    }
+
+    return null;
+  }
+
+  bindStart(bounds: BoundingBox): void {
+    const boxEdges = [
+      // Top edge
+      { x1: bounds.minX, y1: bounds.minY, x2: bounds.maxX, y2: bounds.minY },
+      // Right edge
+      { x1: bounds.maxX, y1: bounds.minY, x2: bounds.maxX, y2: bounds.maxY },
+      // Bottom edge
+      { x1: bounds.maxX, y1: bounds.maxY, x2: bounds.minX, y2: bounds.maxY },
+      // Left edge
+      { x1: bounds.minX, y1: bounds.maxY, x2: bounds.minX, y2: bounds.minY },
+    ];
+
+    for (const edge of this.edges) {
+      const { start, end, leftSite, rightSite } = edge;
+      const leftFace = this.faces.get(leftSite);
+      const rightFace = this.faces.get(rightSite);
+      if (!end) {
+        continue;
+      }
+
+      for (const boxEdge of boxEdges) {
+        const intersection = this.lineIntersection(
+          start[0],
+          start[1],
+          end[0],
+          end[1],
+          boxEdge.x1,
+          boxEdge.y1,
+          boxEdge.x2,
+          boxEdge.y2
+        );
+
+        if (intersection) {
+          const vertex = new Vertex(intersection[0], intersection[1]);
+
+          // Add to both incident faces
+          if (leftFace) leftFace.corners.add(vertex);
+          if (rightFace) rightFace.corners.add(vertex);
+        }
+      }
+    }
   }
 }
