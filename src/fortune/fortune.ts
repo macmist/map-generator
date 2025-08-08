@@ -137,6 +137,30 @@ export class FortuneProcessor {
     this.splitArc(arcAbove, site);
   }
 
+  linkFaces(): void {
+    // Link faces based on edges
+    this.faces.forEach((face) => {
+      face.incidentEdges.forEach((edge) => {
+        if (edge.leftSite && edge.rightSite) {
+          const leftFace = this.faces.get(edge.leftSite);
+          const rightFace = this.faces.get(edge.rightSite);
+          if (leftFace) {
+            if (leftFace.site !== face.site) {
+              leftFace.neighbors.add(face);
+              face.neighbors.add(leftFace);
+            }
+          }
+          if (rightFace) {
+            if (rightFace.site !== face.site) {
+              rightFace.neighbors.add(face);
+              face.neighbors.add(rightFace);
+            }
+          }
+        }
+      });
+    });
+  }
+
   splitArc(arcAbove: Arc, site: Site): void {
     const leftArc = new Arc(arcAbove.site);
     const middleArc = new Arc(site);
