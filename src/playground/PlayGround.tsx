@@ -81,6 +81,8 @@ export const PlayGround = () => {
           : { x: start.x, y: start.y }; // Handle null end
         setFinishedEdges((prev) => [...prev, { start, end }]);
       });
+
+      console.log(fortune.faces);
     }
   }, [points, setVertices]);
 

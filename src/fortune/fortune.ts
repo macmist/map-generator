@@ -2,6 +2,7 @@ import { Point } from "../playground/PlayGround";
 import { Arc } from "./definitions/Arc";
 import { Edge } from "./definitions/Edge";
 import { Event } from "./definitions/Event";
+import { Face } from "./definitions/Face";
 import { Site } from "./definitions/Site";
 import { Vertex } from "./definitions/Vertex";
 import {
@@ -26,6 +27,7 @@ export class FortuneProcessor {
   private eventQueue: EventQueue = new EventQueue();
   public edges: Edge[] = [];
   public vertices: Vertex[] = [];
+  public faces: Map<Site, Face> = new Map(); // Store faces by their site ID
 
   constructor() {
     this.beachLine = new BeachLine();
@@ -42,6 +44,8 @@ export class FortuneProcessor {
 
   addSite(site: Site): void {
     const event = new Event(site.x, site.y, site);
+    const face = new Face(site);
+    this.faces.set(site, face); // Store the face for this site
     this.eventQueue.insert(event);
   }
 
@@ -156,6 +160,8 @@ export class FortuneProcessor {
     const y = arcAbove.evaluate(site.x, this.sweepY);
 
     const vertex = [site.x, y];
+    const siteFace = this.faces.get(site);
+    const arcAboveFace = this.faces.get(arcAbove.site);
     const edgeLeft = new Edge(arcAbove.site, site, vertex[0], vertex[1]);
     const edgeRight = new Edge(site, arcAbove.site, vertex[0], vertex[1]);
     if (arcAbove.leftEdge) {
@@ -165,6 +171,8 @@ export class FortuneProcessor {
       rightArc.rightEdge = arcAbove.rightEdge;
     }
     this.edges.push(edgeLeft, edgeRight);
+    siteFace?.incidentEdges.push(edgeLeft, edgeRight);
+    arcAboveFace?.incidentEdges.push(edgeLeft, edgeRight);
 
     leftArc.rightEdge = edgeLeft;
     rightArc.leftEdge = edgeRight;
@@ -219,11 +227,19 @@ export class FortuneProcessor {
       event.arc.leftEdge.endVertex = vertex;
       event.arc.leftEdge.end = [vertex.x, vertex.y];
       vertex.incidentEdges.push(event.arc.leftEdge);
+      const leftFace = this.faces.get(event.arc.leftEdge.leftSite);
+      leftFace?.corners.add(vertex);
+      const rightFace = this.faces.get(event.arc.leftEdge.rightSite);
+      rightFace?.corners.add(vertex);
     }
     if (event.arc && event.arc.rightEdge) {
       event.arc.rightEdge.endVertex = vertex;
       event.arc.rightEdge.end = [vertex.x, vertex.y];
       vertex.incidentEdges.push(event.arc.rightEdge);
+      const leftFace = this.faces.get(event.arc.rightEdge.leftSite);
+      leftFace?.corners.add(vertex);
+      const rightFace = this.faces.get(event.arc.rightEdge.rightSite);
+      rightFace?.corners.add(vertex);
     }
     this.vertices.push(vertex);
 
@@ -272,6 +288,12 @@ export class FortuneProcessor {
       // Attach this new edge to both neighbors for future circle events
       prevArc.rightEdge = rightEdge;
       nextArc.leftEdge = leftEdge;
+      const siteFace = this.faces.get(prevArc.site);
+      const nextArcFace = this.faces.get(nextArc.site);
+      siteFace?.incidentEdges.push(rightEdge, leftEdge);
+      siteFace?.corners.add(vertex);
+      nextArcFace?.incidentEdges.push(leftEdge, rightEdge);
+      nextArcFace?.corners.add(vertex);
     }
 
     if (prevArc) {
