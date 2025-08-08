@@ -48,6 +48,34 @@ export class BeachLine {
         edge.end = [nextX, current.evaluate(nextX, sweepY)];
         edges.push(edge);
       }
+      if (
+        current.leftEdge &&
+        current.leftEdge.end === null &&
+        current.leftEdge.endVertex === null
+      ) {
+        const nextX = findIntersection(
+          current.leftEdge.leftSite,
+          current.leftEdge.rightSite,
+          sweepY
+        );
+        const edge = current.leftEdge.copy();
+        edge.end = [nextX, current.evaluate(nextX, sweepY)];
+        edges.push(edge);
+      }
+      if (
+        current.rightEdge &&
+        current.rightEdge.end === null &&
+        current.rightEdge.endVertex === null
+      ) {
+        const nextX = findIntersection(
+          current.rightEdge.leftSite,
+          current.rightEdge.rightSite,
+          sweepY
+        );
+        const edge = current.rightEdge.copy();
+        edge.end = [nextX, current.evaluate(nextX, sweepY)];
+        edges.push(edge);
+      }
       current = current.next;
     }
     return edges;

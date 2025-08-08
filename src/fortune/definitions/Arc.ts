@@ -7,6 +7,8 @@ export class Arc {
   public next: Arc | null = null;
   public circleEvent: Event | null = null;
   public edge: Edge | null = null;
+  public leftEdge: Edge | null = null;
+  public rightEdge: Edge | null = null;
 
   constructor(public site: Site) {}
 
