@@ -21,4 +21,13 @@ export class Face {
   asPolygon(): [number, number][] {
     return this.sortCorners().map((v) => [v.x, v.y] as [number, number]);
   }
+
+  relax(): void {
+    if (this.corners.size === 0) return;
+    const sumX = Array.from(this.corners).reduce((sum, v) => sum + v.x, 0);
+    const sumY = Array.from(this.corners).reduce((sum, v) => sum + v.y, 0);
+    const count = this.corners.size;
+    this.site.x = sumX / count;
+    this.site.y = sumY / count;
+  }
 }

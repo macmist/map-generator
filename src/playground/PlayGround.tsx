@@ -1,9 +1,11 @@
 import { Container } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
-import { Group, Layer, Line, Stage } from "react-konva";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Group, Image, Layer, Line, Stage } from "react-konva";
 import { BoundingBox, FortuneProcessor } from "../fortune/fortune";
 import { Site } from "../fortune/definitions/Site";
 import { Face } from "../fortune/definitions/Face";
+import { Perlin2d } from "../noise/Perlin";
+import Konva from "konva";
 
 export type Point = {
   x: number;
@@ -62,7 +64,8 @@ export const PlayGround = () => {
   const [vertices, setVertices] = useState<Point[]>([]);
   const [finshedEdges, setFinishedEdges] = useState<Edge[]>([]);
   const [faces, setFaces] = useState<Face[]>([]);
-  const fortune = new FortuneProcessor();
+  const fortune = useMemo(() => new FortuneProcessor(), []);
+  const perlin = useMemo(() => new Perlin2d(Math.random() * 10000), []);
 
   const cleanUp = useCallback(() => {
     setPoints([]);
@@ -112,18 +115,61 @@ export const PlayGround = () => {
     maxY: 700,
   };
 
+  const relaxFaces = useCallback(() => {
+    fortune.relaxFaces();
+    setPoints(fortune.getFaceSites());
+  }, [fortune]);
+
+  const [image, setImage] = useState<HTMLCanvasElement | null>(null);
+
+  const perlinNoise = useCallback(() => {
+    perlin.setSeed(Math.random() * 10000);
+    const size = box.maxX;
+    const grid = perlin.generateGrid(size, size, 0.05);
+
+    // Create an offscreen canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+    const imageData = ctx.createImageData(size, size);
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const value = grid[y][x];
+        const shade = Math.floor(value * 255);
+        const idx = (y * size + x) * 4;
+        imageData.data[idx] = shade;
+        imageData.data[idx + 1] = shade;
+        imageData.data[idx + 2] = shade;
+        imageData.data[idx + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    setImage(canvas);
+  }, [box.maxX, perlin]);
+
   return (
     <Container>
       <h1>PlayGround</h1>
       <button onClick={() => cleanUp()}>Reset</button>
       <button
         onClick={() => {
-          const randomPoints = generateRandomPoints(100);
+          const randomPoints = generateRandomPoints(500);
           setPoints(randomPoints);
         }}
       >
         Generate points
       </button>
+      <button
+        onClick={() => {
+          relaxFaces();
+        }}
+      >
+        Relax Faces
+      </button>
+      <button onClick={() => perlinNoise()}>Perlin Noise</button>
       <div
         style={{ width: box.maxX, height: box.maxY, border: "1px solid black" }}
       >
@@ -134,9 +180,7 @@ export const PlayGround = () => {
                 .asPolygon()
 
                 .flatMap((p) => [p[0], p[1]]);
-              if (face.site.x < 100 && face.site.y > 600) {
-                console.log("Face points:", points, face.color);
-              }
+
               return (
                 <Line
                   key={i}
@@ -168,6 +212,7 @@ export const PlayGround = () => {
               />
             ))}
           </Layer>
+          <Layer opacity={0.5}>{image && <Image image={image} />}</Layer>
         </Stage>
       </div>
     </Container>

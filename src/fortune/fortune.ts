@@ -70,7 +70,6 @@ export class FortuneProcessor {
     if (!event) {
       return;
     }
-    console.log(`Processing event at (${event.x}, ${event.y})`);
     // this.beachLine.display();
 
     if (event.site) {
@@ -88,49 +87,34 @@ export class FortuneProcessor {
   }
 
   computeFortune(): void {
-    console.log("Starting Fortune's algorithm...");
     while (!this.eventQueue.isEmpty()) {
       const event = this.eventQueue.pop();
       if (!event) {
-        console.error("No event to process");
         continue;
       }
       this.sweepY = event.y;
-      console.log(`Sweep line at y = ${this.sweepY}`);
 
       if (event.site) {
-        console.log(`Processing site event at (${event.x}, ${event.y})`);
         this.handleSiteEvent(event.site);
       } else {
-        console.log(`Processing circle event at (${event.x}, ${event.y})`);
         this.handleCircleEvent(event);
       }
     }
-    console.log("Fortune's algorithm completed.");
   }
 
   handleSiteEvent(site: Site): void {
     const head = this.beachLine.head();
     if (!head) {
-      console.log("No arcs in the beach line, creating new head arc");
       this.beachLine.setHead(new Arc(site));
       return;
     }
     const arcAbove = this.beachLine.findArcAboveX(site.x, this.sweepY);
     if (!arcAbove) {
-      console.error("No arc found above the site, not sure this should happen");
       return;
     }
-    console.log(
-      "arcAbove:",
-      arcAbove.site.x,
-      arcAbove.site.y,
-      arcAbove.prev,
-      arcAbove.next
-    );
+
     if (arcAbove.circleEvent) {
       // Remove the circle event if it exists
-      console.log("Removing circle event for arc above site");
       arcAbove.circleEvent.valid = false;
       arcAbove.circleEvent = null;
     }
@@ -219,11 +203,6 @@ export class FortuneProcessor {
     }
 
     if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
-      console.log(leftSite, arc.site, rightSite);
-      console.log(orientation(leftSite, arc.site, rightSite));
-      console.error(
-        "Sites are not in counter-clockwise order, cannot form circle event"
-      );
       return; // Not a valid event
     }
 
@@ -237,7 +216,6 @@ export class FortuneProcessor {
     const event = new Event(circle.x, eventY, null, arc);
     event.circle = new Site(circle.x, circle.y); // Store the circle center
     arc.circleEvent = event;
-    console.log("inserting circle event at", event.x, event.y);
     this.eventQueue.insert(event);
   }
 
@@ -358,11 +336,6 @@ export class FortuneProcessor {
       });
 
       if (closestFace !== null) {
-        console.log(
-          `Adding corner (${corner.x}, ${corner.y}) to face at (${
-            (closestFace as Face).site.x
-          }, ${(closestFace as Face).site.y})`
-        );
         (closestFace as Face).corners.add(corner);
       }
     }
@@ -459,5 +432,19 @@ export class FortuneProcessor {
     }
 
     return null; // No intersection with box
+  }
+
+  relaxFaces(): void {
+    this.faces.forEach((face) => face.relax());
+  }
+
+  getFaceSites(): Site[] {
+    const sites: Site[] = [];
+    this.faces.forEach((face) => {
+      if (face.site) {
+        sites.push(face.site);
+      }
+    });
+    return sites;
   }
 }
