@@ -1,7 +1,7 @@
 import { Container } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { Group, Layer, Line, Stage } from "react-konva";
-import { FortuneProcessor } from "../fortune/fortune";
+import { BoundingBox, FortuneProcessor } from "../fortune/fortune";
 import { Site } from "../fortune/definitions/Site";
 import { Face } from "../fortune/definitions/Face";
 
@@ -99,31 +99,44 @@ export const PlayGround = () => {
         setFinishedEdges((prev) => [...prev, { start, end }]);
       });
       fortune.linkFaces();
-      console.log(fortune.faces);
       fortune.randomizeColors();
       const faces = Array.from(fortune.faces.values());
       setFaces(faces);
     }
   }, [points]);
 
+  const box: BoundingBox = {
+    minX: 0,
+    minY: 0,
+    maxX: 700,
+    maxY: 700,
+  };
+
   return (
     <Container>
       <h1>PlayGround</h1>
-      <div style={{ width: 700, height: 700, border: "1px solid black" }}>
-        <button onClick={() => cleanUp()}>Reset</button>
-        <button
-          onClick={() => {
-            const randomPoints = generateRandomPoints(100);
-            setPoints(randomPoints);
-          }}
-        >
-          Generate points
-        </button>
-        <Stage width={700} height={700}>
+      <button onClick={() => cleanUp()}>Reset</button>
+      <button
+        onClick={() => {
+          const randomPoints = generateRandomPoints(100);
+          setPoints(randomPoints);
+        }}
+      >
+        Generate points
+      </button>
+      <div
+        style={{ width: box.maxX, height: box.maxY, border: "1px solid black" }}
+      >
+        <Stage width={box.maxX} height={box.maxY}>
           <Layer id="faces" clearBeforeDraw={true}>
             {faces.map((face, i) => {
-              const points = face.asPolygon().flatMap((p) => [p[0], p[1]]);
-              console.log("Face points:", points, face.color);
+              const points = face
+                .asPolygon()
+
+                .flatMap((p) => [p[0], p[1]]);
+              if (face.site.x < 100 && face.site.y > 600) {
+                console.log("Face points:", points, face.color);
+              }
               return (
                 <Line
                   key={i}

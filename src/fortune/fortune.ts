@@ -370,158 +370,94 @@ export class FortuneProcessor {
 
   bindToBox(box: BoundingBox): void {
     this.addCornersToFaces(box);
-    this.bindStart(box);
     for (const edge of this.edges) {
-      if (!edge.end) {
-        const clipped = this.clipEdgeToBox(edge, box);
-        if (clipped) {
-          edge.end = clipped;
-          edge.endVertex = new Vertex(clipped[0], clipped[1]);
-          let face = this.faces.get(edge.leftSite);
-          if (face) {
-            face.corners.add(edge.endVertex);
-          }
-          let rightFace = this.faces.get(edge.rightSite);
-          if (rightFace) {
-            rightFace.corners.add(edge.endVertex);
-          }
-        } else {
-          // Optionally: remove the edge if it doesn’t intersect the box
-          console.warn("Edge did not intersect bounding box", edge);
+      const clipped = this.clipToBox(edge, box);
+      if (clipped) {
+        edge.start = clipped[0];
+        edge.end = clipped[1];
+        const leftFace = this.faces.get(edge.leftSite);
+        const rightFace = this.faces.get(edge.rightSite);
+        if (leftFace) {
+          leftFace.corners.add(new Vertex(edge.start[0], edge.start[1]));
+          leftFace.corners.add(new Vertex(edge.end[0], edge.end[1]));
+        }
+        if (rightFace) {
+          rightFace.corners.add(new Vertex(edge.end[0], edge.end[1]));
+          rightFace.corners.add(new Vertex(edge.start[0], edge.start[1]));
         }
       }
     }
   }
 
-  clipEdgeToBox(edge: Edge, box: BoundingBox): [number, number] | null {
-    const [x0, y0] = edge.start;
-    const [dx, dy] = edge.direction;
+  clipToBox(
+    edge: Edge,
+    box: BoundingBox
+  ): [[number, number], [number, number]] | null {
+    const { minX, minY, maxX, maxY } = box;
 
-    const candidates: [number, number][] = [];
+    let p1: [number, number] | undefined = edge.start;
+    let p2: [number, number] | null = edge.end;
 
-    // Intersect with left (x = minX)
-    if (dx !== 0) {
-      const t = (box.minX - x0) / dx;
-      const y = y0 + t * dy;
-      if (y >= box.minY && y <= box.maxY && t > 0) {
-        candidates.push([box.minX, y]);
-      }
+    // If we only have a start and direction (ray), extend far to create a virtual segment
+    if (p1 && !p2 && edge.direction) {
+      const [dx, dy] = edge.direction;
+      p2 = [p1[0] + dx * 1e6, p1[1] + dy * 1e6]; // huge extension
     }
 
-    // Intersect with right (x = maxX)
-    if (dx !== 0) {
-      const t = (box.maxX - x0) / dx;
-      const y = y0 + t * dy;
-      if (y >= box.minY && y <= box.maxY && t > 0) {
-        candidates.push([box.maxX, y]);
-      }
+    // If we only have an end and direction (reverse ray), extend backwards
+    if (!p1 && p2 && edge.direction) {
+      const [dx, dy] = edge.direction;
+      p1 = [p2[0] - dx * 1e6, p2[1] - dy * 1e6];
     }
 
-    // Intersect with top (y = minY)
-    if (dy !== 0) {
-      const t = (box.minY - y0) / dy;
-      const x = x0 + t * dx;
-      if (x >= box.minX && x <= box.maxX && t > 0) {
-        candidates.push([x, box.minY]);
+    // If still missing one point, we can't clip
+    if (!p1 || !p2) return null;
+
+    // Liang–Barsky algorithm for segment-box clipping
+    let [x0, y0] = p1;
+    let [x1, y1] = p2;
+
+    let t0 = 0;
+    let t1 = 1;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+
+    const clipTest = (p: number, q: number) => {
+      if (p === 0) {
+        if (q < 0) return false; // parallel and outside
+      } else {
+        const r = q / p;
+        if (p < 0) {
+          if (r > t1) return false;
+          if (r > t0) t0 = r;
+        } else if (p > 0) {
+          if (r < t0) return false;
+          if (r < t1) t1 = r;
+        }
       }
-    }
+      return true;
+    };
 
-    // Intersect with bottom (y = maxY)
-    if (dy !== 0) {
-      const t = (box.maxY - y0) / dy;
-      const x = x0 + t * dx;
-      if (x >= box.minX && x <= box.maxX && t > 0) {
-        candidates.push([x, box.maxY]);
-      }
-    }
-
-    // Return the closest valid intersection
-    if (candidates.length === 0) return null;
-
-    candidates.sort((a, b) => {
-      const da = (a[0] - x0) ** 2 + (a[1] - y0) ** 2;
-      const db = (b[0] - x0) ** 2 + (b[1] - y0) ** 2;
-      return da - db;
-    });
-
-    return candidates[0];
-  }
-
-  lineIntersection(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    x3: number,
-    y3: number,
-    x4: number,
-    y4: number
-  ): [number, number] | null {
-    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (denom === 0) return null; // Parallel
-
-    const px =
-      ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) /
-      denom;
-    const py =
-      ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) /
-      denom;
-
-    // Check if intersection is within both segments
-    const within = (min: number, max: number, v: number) =>
-      v >= Math.min(min, max) && v <= Math.max(min, max);
     if (
-      within(x1, x2, px) &&
-      within(y1, y2, py) &&
-      within(x3, x4, px) &&
-      within(y3, y4, py)
+      clipTest(-dx, x0 - minX) &&
+      clipTest(dx, maxX - x0) &&
+      clipTest(-dy, y0 - minY) &&
+      clipTest(dy, maxY - y0)
     ) {
-      return [px, py];
+      if (t1 < 1) {
+        x1 = x0 + t1 * dx;
+        y1 = y0 + t1 * dy;
+      }
+      if (t0 > 0) {
+        x0 = x0 + t0 * dx;
+        y0 = y0 + t0 * dy;
+      }
+      return [
+        [x0, y0],
+        [x1, y1],
+      ];
     }
 
-    return null;
-  }
-
-  bindStart(bounds: BoundingBox): void {
-    const boxEdges = [
-      // Top edge
-      { x1: bounds.minX, y1: bounds.minY, x2: bounds.maxX, y2: bounds.minY },
-      // Right edge
-      { x1: bounds.maxX, y1: bounds.minY, x2: bounds.maxX, y2: bounds.maxY },
-      // Bottom edge
-      { x1: bounds.maxX, y1: bounds.maxY, x2: bounds.minX, y2: bounds.maxY },
-      // Left edge
-      { x1: bounds.minX, y1: bounds.maxY, x2: bounds.minX, y2: bounds.minY },
-    ];
-
-    for (const edge of this.edges) {
-      const { start, end, leftSite, rightSite } = edge;
-      const leftFace = this.faces.get(leftSite);
-      const rightFace = this.faces.get(rightSite);
-      if (!end) {
-        continue;
-      }
-
-      for (const boxEdge of boxEdges) {
-        const intersection = this.lineIntersection(
-          start[0],
-          start[1],
-          end[0],
-          end[1],
-          boxEdge.x1,
-          boxEdge.y1,
-          boxEdge.x2,
-          boxEdge.y2
-        );
-
-        if (intersection) {
-          const vertex = new Vertex(intersection[0], intersection[1]);
-
-          // Add to both incident faces
-          if (leftFace) leftFace.corners.add(vertex);
-          if (rightFace) rightFace.corners.add(vertex);
-        }
-      }
-    }
+    return null; // No intersection with box
   }
 }
