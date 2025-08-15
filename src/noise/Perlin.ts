@@ -1,111 +1,100 @@
 export class Perlin2d {
-  private grad2: [number, number][] = [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-    [Math.SQRT1_2, Math.SQRT1_2],
-    [-Math.SQRT1_2, Math.SQRT1_2],
-    [Math.SQRT1_2, -Math.SQRT1_2],
-    [-Math.SQRT1_2, -Math.SQRT1_2],
-  ];
-
-  private perm: number[];
+  private permutation: number[];
 
   constructor(seed?: number) {
-    this.perm = this.buildPermutation(seed);
+    this.permutation = this.generatePermutation(seed);
   }
 
-  public setSeed(seed: number): void {
-    this.perm = this.buildPermutation(seed);
-  }
+  public generatePermutation(seed?: number): number[] {
+    console.log("Generating permutation with seed:", seed);
+    const p: number[] = [];
+    for (let i = 0; i < 256; i++) p[i] = i;
 
-  // Smooth interpolation curve
-  private fade(t: number): number {
-    return t * t * t * (t * (t * 6 - 15) + 10);
-  }
-
-  private lerp(a: number, b: number, t: number): number {
-    return a + t * (b - a);
-  }
-
-  private buildPermutation(seed?: number): number[] {
-    const p = new Array(256).fill(0).map((_, i) => i);
-
-    // Optional seed: deterministic shuffle
     if (seed !== undefined) {
-      let rng = this.xorshift32(seed);
-      for (let i = p.length - 1; i > 0; i--) {
-        const j = rng() % (i + 1);
+      let random = this.xorshift(seed);
+      for (let i = 255; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
         [p[i], p[j]] = [p[j], p[i]];
       }
     } else {
-      for (let i = p.length - 1; i > 0; i--) {
+      for (let i = 255; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [p[i], p[j]] = [p[j], p[i]];
       }
     }
 
-    return [...p, ...p]; // duplicate for overflow
+    return [...p, ...p];
   }
 
-  // Simple xorshift32 PRNG for deterministic permutation
-  private xorshift32(seed: number) {
-    let state = seed || 1;
-    return () => {
-      state ^= state << 13;
-      state ^= state >> 17;
-      state ^= state << 5;
-      return Math.abs(state);
+  private xorshift(seed: number) {
+    let x = seed % 2147483647;
+    return function () {
+      x ^= x << 13;
+      x ^= x >> 17;
+      x ^= x << 5;
+      return ((x < 0 ? ~x + 1 : x) % 2147483647) / 2147483647;
     };
   }
 
-  private dotGridGradient(
-    ix: number,
-    iy: number,
+  private fade(t: number) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  }
+
+  private lerp(t: number, a: number, b: number) {
+    return a + t * (b - a);
+  }
+
+  private grad(hash: number, x: number, y: number) {
+    const h = hash & 3;
+    const u = h < 2 ? x : y;
+    const v = h < 2 ? y : x;
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+  }
+
+  noise(x: number, y: number): number {
+    const X = Math.floor(x) & 255;
+    const Y = Math.floor(y) & 255;
+
+    x -= Math.floor(x);
+    y -= Math.floor(y);
+
+    const u = this.fade(x);
+    const v = this.fade(y);
+
+    const p = this.permutation;
+    const aa = p[p[X] + Y];
+    const ab = p[p[X] + Y + 1];
+    const ba = p[p[X + 1] + Y];
+    const bb = p[p[X + 1] + Y + 1];
+
+    return this.lerp(
+      v,
+      this.lerp(u, this.grad(aa, x, y), this.grad(ba, x - 1, y)),
+      this.lerp(u, this.grad(ab, x, y - 1), this.grad(bb, x - 1, y - 1))
+    );
+  }
+
+  // NEW: Noise with octaves
+  noise2D(
     x: number,
-    y: number
-  ): number {
-    const idx = this.perm[(ix + this.perm[iy & 255]) & 255] & 7;
-    const grad = this.grad2[idx];
-    const dx = x - ix;
-    const dy = y - iy;
-    return dx * grad[0] + dy * grad[1];
-  }
+    y: number,
+    octaves: number,
+    persistence: number,
+    lacunarity: number
+  ) {
+    let total = 0;
+    let frequency = 1;
+    let amplitude = 1;
+    let maxValue = 0;
 
-  public noise(x: number, y: number): number {
-    const x0 = Math.floor(x);
-    const y0 = Math.floor(y);
-    const x1 = x0 + 1;
-    const y1 = y0 + 1;
-
-    const sx = this.fade(x - x0);
-    const sy = this.fade(y - y0);
-
-    const n00 = this.dotGridGradient(x0, y0, x, y);
-    const n10 = this.dotGridGradient(x1, y0, x, y);
-    const n01 = this.dotGridGradient(x0, y1, x, y);
-    const n11 = this.dotGridGradient(x1, y1, x, y);
-
-    const ix0 = this.lerp(n00, n10, sx);
-    const ix1 = this.lerp(n01, n11, sx);
-
-    return this.lerp(ix0, ix1, sy);
-  }
-
-  public generateGrid(
-    width: number,
-    height: number,
-    scale: number
-  ): number[][] {
-    const grid: number[][] = [];
-    for (let y = 0; y < height; y++) {
-      grid[y] = [];
-      for (let x = 0; x < width; x++) {
-        const value = this.noise(x * scale, y * scale);
-        grid[y][x] = (value + 1) / 2; // normalize to [0, 1]
-      }
+    for (let i = 0; i < octaves; i++) {
+      total += this.noise(x * frequency, y * frequency) * amplitude;
+      maxValue += amplitude;
+      amplitude *= persistence;
+      frequency *= lacunarity;
     }
-    return grid;
+
+    // Normalize to [0, 1]
+    return (total / maxValue + 1) / 2;
   }
 }

@@ -5,7 +5,6 @@ import { BoundingBox, FortuneProcessor } from "../fortune/fortune";
 import { Site } from "../fortune/definitions/Site";
 import { Face } from "../fortune/definitions/Face";
 import { Perlin2d } from "../noise/Perlin";
-import Konva from "konva";
 
 export type Point = {
   x: number;
@@ -49,12 +48,10 @@ const POINTS: Point[] = [
 ];
 
 const getColorFromHeight = (height: number): string => {
-  if (height < 0.1) return "darkblue";
-  if (height < 0.5) return "blue";
-
-  if (height < 0.6) return "yellow";
-  if (height < 0.7) return "green";
-  return "brown";
+  if (height < 0.1) return "#0000cc"; // deep water
+  if (height < 0.5) return "#996633"; // sand/rock
+  if (height < 0.8) return "#339933"; // grass
+  return "#ffffff"; // snow
 };
 
 const generateRandomPoints = (count: number): Point[] => {
@@ -67,6 +64,14 @@ const generateRandomPoints = (count: number): Point[] => {
   }
   return points;
 };
+
+function islandMask(x: number, y: number, size: number): number {
+  const nx = (x / size) * 2 - 1; // map to -1..1
+  const ny = (y / size) * 2 - 1;
+  const distance = Math.sqrt(nx * nx + ny * ny);
+  // Falloff: 1 at center, 0 at edges
+  return Math.max(0, 1 - distance);
+}
 
 export const PlayGround = () => {
   const [points, setPoints] = useState<Point[]>(POINTS);
@@ -136,10 +141,12 @@ export const PlayGround = () => {
   const [grid, setGrid] = useState<number[][]>([]);
 
   const perlinNoise = useCallback(() => {
-    perlin.setSeed(Math.random() * 10000);
+    perlin.generatePermutation(Math.random() * 10000);
     const size = box.maxX;
-    const grid = perlin.generateGrid(size, size, 0.003);
-
+    const scale = 0.005; // controls island size
+    const octaves = 5;
+    const persistence = 0.5;
+    const lacunarity = 2;
     // Create an offscreen canvas
     const canvas = document.createElement("canvas");
     canvas.width = size;
@@ -149,7 +156,17 @@ export const PlayGround = () => {
 
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        const value = grid[y][x];
+        let noiseValue = perlin.noise2D(
+          x * scale,
+          y * scale,
+          octaves,
+          persistence,
+          lacunarity
+        );
+
+        const mask = islandMask(x, y, size);
+        const value = noiseValue * mask;
+        grid[y][x] = value; // Store the value in the grid
         const shade = Math.floor(value * 255);
         const idx = (y * size + x) * 4;
         imageData.data[idx] = shade;
@@ -164,7 +181,7 @@ export const PlayGround = () => {
     setGrid(grid);
     setPerlinVisible(true);
     setConstructionVisible(true);
-  }, [box.maxX, perlin]);
+  }, [box.maxX, grid, perlin]);
 
   const assignPerlinToFaces = useCallback(() => {
     setPerlinVisible(false);
@@ -173,7 +190,6 @@ export const PlayGround = () => {
     const faces = Array.from(fortune.faces.values());
     faces.forEach((face) => {
       const height = face.height;
-      console.log("height", height);
       face.color = getColorFromHeight(height);
     });
     setFaces(faces);
@@ -266,7 +282,7 @@ export const PlayGround = () => {
               </Layer>
             </>
           )}
-          <Layer id="perlin" opacity={0.5} visible={perlinVisible}>
+          <Layer id="perlin" opacity={0.8} visible={perlinVisible}>
             {image && <Image image={image} />}
           </Layer>
         </Stage>
