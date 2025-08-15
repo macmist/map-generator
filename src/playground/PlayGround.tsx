@@ -1,9 +1,11 @@
 import { Container } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
-import { Group, Layer, Line, Stage } from "react-konva";
-import { FortuneProcessor } from "../fortune/fortune";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Group, Image, Layer, Line, Stage } from "react-konva";
+import { BoundingBox, FortuneProcessor } from "../fortune/fortune";
 import { Site } from "../fortune/definitions/Site";
 import { Face } from "../fortune/definitions/Face";
+import { Perlin2d } from "../noise/Perlin";
+import Konva from "konva";
 
 export type Point = {
   x: number;
@@ -46,6 +48,15 @@ const POINTS: Point[] = [
   { x: 250, y: 550 },
 ];
 
+const getColorFromHeight = (height: number): string => {
+  if (height < 0.1) return "darkblue";
+  if (height < 0.5) return "blue";
+
+  if (height < 0.6) return "yellow";
+  if (height < 0.7) return "green";
+  return "brown";
+};
+
 const generateRandomPoints = (count: number): Point[] => {
   const points: Point[] = [];
   for (let i = 0; i < count; i++) {
@@ -62,13 +73,15 @@ export const PlayGround = () => {
   const [vertices, setVertices] = useState<Point[]>([]);
   const [finshedEdges, setFinishedEdges] = useState<Edge[]>([]);
   const [faces, setFaces] = useState<Face[]>([]);
-  const fortune = new FortuneProcessor();
+  const fortune = useMemo(() => new FortuneProcessor(), []);
+  const perlin = useMemo(() => new Perlin2d(Math.random() * 10000), []);
 
   const cleanUp = useCallback(() => {
     setPoints([]);
     setFinishedEdges([]);
     setVertices([]);
     setFaces([]);
+    setConstructionVisible(true);
   }, []);
 
   useEffect(() => {
@@ -99,31 +112,120 @@ export const PlayGround = () => {
         setFinishedEdges((prev) => [...prev, { start, end }]);
       });
       fortune.linkFaces();
-      console.log(fortune.faces);
       fortune.randomizeColors();
       const faces = Array.from(fortune.faces.values());
       setFaces(faces);
+      console.log("done");
     }
-  }, [points]);
+  }, [points, fortune]);
+
+  const box: BoundingBox = {
+    minX: 0,
+    minY: 0,
+    maxX: 700,
+    maxY: 700,
+  };
+
+  const relaxFaces = useCallback(() => {
+    fortune.relaxFaces();
+    setPoints(fortune.getFaceSites());
+    setConstructionVisible(true);
+  }, [fortune]);
+
+  const [image, setImage] = useState<HTMLCanvasElement | null>(null);
+  const [grid, setGrid] = useState<number[][]>([]);
+
+  const perlinNoise = useCallback(() => {
+    perlin.setSeed(Math.random() * 10000);
+    const size = box.maxX;
+    const grid = perlin.generateGrid(size, size, 0.003);
+
+    // Create an offscreen canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+    const imageData = ctx.createImageData(size, size);
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const value = grid[y][x];
+        const shade = Math.floor(value * 255);
+        const idx = (y * size + x) * 4;
+        imageData.data[idx] = shade;
+        imageData.data[idx + 1] = shade;
+        imageData.data[idx + 2] = shade;
+        imageData.data[idx + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    setImage(canvas);
+    setGrid(grid);
+    setPerlinVisible(true);
+    setConstructionVisible(true);
+  }, [box.maxX, perlin]);
+
+  const assignPerlinToFaces = useCallback(() => {
+    setPerlinVisible(false);
+    console.log("Assigning Perlin noise to faces");
+    fortune.assignHeightToFaces(grid);
+    const faces = Array.from(fortune.faces.values());
+    faces.forEach((face) => {
+      const height = face.height;
+      console.log("height", height);
+      face.color = getColorFromHeight(height);
+    });
+    setFaces(faces);
+    setConstructionVisible(true);
+  }, [fortune, grid]);
+
+  const [perlinVisible, setPerlinVisible] = useState(false);
+
+  const [constructionVisible, setConstructionVisible] = useState(true);
+
+  const toggleConstruction = useCallback(() => {
+    setConstructionVisible((prev) => !prev);
+  }, []);
 
   return (
     <Container>
       <h1>PlayGround</h1>
-      <div style={{ width: 700, height: 700, border: "1px solid black" }}>
-        <button onClick={() => cleanUp()}>Reset</button>
-        <button
-          onClick={() => {
-            const randomPoints = generateRandomPoints(100);
-            setPoints(randomPoints);
-          }}
-        >
-          Generate points
-        </button>
-        <Stage width={700} height={700}>
+      <button onClick={() => cleanUp()}>Reset</button>
+      <button
+        onClick={() => {
+          const randomPoints = generateRandomPoints(1000);
+          setPoints(randomPoints);
+          setConstructionVisible(true);
+        }}
+      >
+        Generate points
+      </button>
+      <button
+        onClick={() => {
+          relaxFaces();
+        }}
+      >
+        Relax Faces
+      </button>
+      <button onClick={() => perlinNoise()}>Perlin Noise</button>
+      <button onClick={() => assignPerlinToFaces()}>
+        Assign Perlin to Faces
+      </button>
+      <button onClick={() => toggleConstruction()}>
+        Toggle Construction (Edges, Vertices, Points)
+      </button>
+      <div
+        style={{ width: box.maxX, height: box.maxY, border: "1px solid black" }}
+      >
+        <Stage width={box.maxX} height={box.maxY}>
           <Layer id="faces" clearBeforeDraw={true}>
             {faces.map((face, i) => {
-              const points = face.asPolygon().flatMap((p) => [p[0], p[1]]);
-              console.log("Face points:", points, face.color);
+              const points = face
+                .asPolygon()
+
+                .flatMap((p) => [p[0], p[1]]);
+
               return (
                 <Line
                   key={i}
@@ -134,26 +236,38 @@ export const PlayGround = () => {
               );
             })}
           </Layer>
+          {constructionVisible && (
+            <>
+              <Layer id="points">
+                {points.map((p, i) => (
+                  <PointComponent key={i} x={p.x} y={p.y} />
+                ))}
+              </Layer>
 
-          <Layer id="points">
-            {points.map((p, i) => (
-              <PointComponent key={i} x={p.x} y={p.y} />
-            ))}
-          </Layer>
-          <Layer id="vertices">
-            {vertices.map((p, i) => (
-              <PointComponent key={i} x={p.x} y={p.y} color="red" />
-            ))}
-          </Layer>
+              <Layer id="vertices">
+                {vertices.map((p, i) => (
+                  <PointComponent key={i} x={p.x} y={p.y} color="red" />
+                ))}
+              </Layer>
 
-          <Layer id="edges" clearBeforeDraw={true}>
-            {finshedEdges.map((edge, i) => (
-              <Line
-                key={i}
-                stroke={"orange"}
-                points={[edge.start.x, edge.start.y, edge.end.x, edge.end.y]}
-              />
-            ))}
+              <Layer id="edges" clearBeforeDraw={true}>
+                {finshedEdges.map((edge, i) => (
+                  <Line
+                    key={i}
+                    stroke={"orange"}
+                    points={[
+                      edge.start.x,
+                      edge.start.y,
+                      edge.end.x,
+                      edge.end.y,
+                    ]}
+                  />
+                ))}
+              </Layer>
+            </>
+          )}
+          <Layer id="perlin" opacity={0.5} visible={perlinVisible}>
+            {image && <Image image={image} />}
           </Layer>
         </Stage>
       </div>

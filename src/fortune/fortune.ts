@@ -28,6 +28,8 @@ export class FortuneProcessor {
   public edges: Edge[] = [];
   public vertices: Vertex[] = [];
   public faces: Map<Site, Face> = new Map(); // Store faces by their site ID
+  public minHeight: number = Infinity;
+  public maxHeight: number = -Infinity;
 
   constructor() {
     this.beachLine = new BeachLine();
@@ -70,7 +72,6 @@ export class FortuneProcessor {
     if (!event) {
       return;
     }
-    console.log(`Processing event at (${event.x}, ${event.y})`);
     // this.beachLine.display();
 
     if (event.site) {
@@ -88,49 +89,34 @@ export class FortuneProcessor {
   }
 
   computeFortune(): void {
-    console.log("Starting Fortune's algorithm...");
     while (!this.eventQueue.isEmpty()) {
       const event = this.eventQueue.pop();
       if (!event) {
-        console.error("No event to process");
         continue;
       }
       this.sweepY = event.y;
-      console.log(`Sweep line at y = ${this.sweepY}`);
 
       if (event.site) {
-        console.log(`Processing site event at (${event.x}, ${event.y})`);
         this.handleSiteEvent(event.site);
       } else {
-        console.log(`Processing circle event at (${event.x}, ${event.y})`);
         this.handleCircleEvent(event);
       }
     }
-    console.log("Fortune's algorithm completed.");
   }
 
   handleSiteEvent(site: Site): void {
     const head = this.beachLine.head();
     if (!head) {
-      console.log("No arcs in the beach line, creating new head arc");
       this.beachLine.setHead(new Arc(site));
       return;
     }
     const arcAbove = this.beachLine.findArcAboveX(site.x, this.sweepY);
     if (!arcAbove) {
-      console.error("No arc found above the site, not sure this should happen");
       return;
     }
-    console.log(
-      "arcAbove:",
-      arcAbove.site.x,
-      arcAbove.site.y,
-      arcAbove.prev,
-      arcAbove.next
-    );
+
     if (arcAbove.circleEvent) {
       // Remove the circle event if it exists
-      console.log("Removing circle event for arc above site");
       arcAbove.circleEvent.valid = false;
       arcAbove.circleEvent = null;
     }
@@ -219,11 +205,6 @@ export class FortuneProcessor {
     }
 
     if (orientation(leftSite, arc.site, rightSite) !== Orientation.CLOCKWISE) {
-      console.log(leftSite, arc.site, rightSite);
-      console.log(orientation(leftSite, arc.site, rightSite));
-      console.error(
-        "Sites are not in counter-clockwise order, cannot form circle event"
-      );
       return; // Not a valid event
     }
 
@@ -237,7 +218,6 @@ export class FortuneProcessor {
     const event = new Event(circle.x, eventY, null, arc);
     event.circle = new Site(circle.x, circle.y); // Store the circle center
     arc.circleEvent = event;
-    console.log("inserting circle event at", event.x, event.y);
     this.eventQueue.insert(event);
   }
 
@@ -358,11 +338,6 @@ export class FortuneProcessor {
       });
 
       if (closestFace !== null) {
-        console.log(
-          `Adding corner (${corner.x}, ${corner.y}) to face at (${
-            (closestFace as Face).site.x
-          }, ${(closestFace as Face).site.y})`
-        );
         (closestFace as Face).corners.add(corner);
       }
     }
@@ -370,158 +345,151 @@ export class FortuneProcessor {
 
   bindToBox(box: BoundingBox): void {
     this.addCornersToFaces(box);
-    this.bindStart(box);
     for (const edge of this.edges) {
-      if (!edge.end) {
-        const clipped = this.clipEdgeToBox(edge, box);
-        if (clipped) {
-          edge.end = clipped;
-          edge.endVertex = new Vertex(clipped[0], clipped[1]);
-          let face = this.faces.get(edge.leftSite);
-          if (face) {
-            face.corners.add(edge.endVertex);
-          }
-          let rightFace = this.faces.get(edge.rightSite);
-          if (rightFace) {
-            rightFace.corners.add(edge.endVertex);
-          }
-        } else {
-          // Optionally: remove the edge if it doesn’t intersect the box
-          console.warn("Edge did not intersect bounding box", edge);
+      const clipped = this.clipToBox(edge, box);
+      if (clipped) {
+        edge.start = clipped[0];
+        edge.end = clipped[1];
+        const leftFace = this.faces.get(edge.leftSite);
+        const rightFace = this.faces.get(edge.rightSite);
+        if (leftFace) {
+          leftFace.corners.add(new Vertex(edge.start[0], edge.start[1]));
+          leftFace.corners.add(new Vertex(edge.end[0], edge.end[1]));
+        }
+        if (rightFace) {
+          rightFace.corners.add(new Vertex(edge.end[0], edge.end[1]));
+          rightFace.corners.add(new Vertex(edge.start[0], edge.start[1]));
         }
       }
     }
   }
 
-  clipEdgeToBox(edge: Edge, box: BoundingBox): [number, number] | null {
-    const [x0, y0] = edge.start;
-    const [dx, dy] = edge.direction;
+  clipToBox(
+    edge: Edge,
+    box: BoundingBox
+  ): [[number, number], [number, number]] | null {
+    const { minX, minY, maxX, maxY } = box;
 
-    const candidates: [number, number][] = [];
+    let p1: [number, number] | undefined = edge.start;
+    let p2: [number, number] | null = edge.end;
 
-    // Intersect with left (x = minX)
-    if (dx !== 0) {
-      const t = (box.minX - x0) / dx;
-      const y = y0 + t * dy;
-      if (y >= box.minY && y <= box.maxY && t > 0) {
-        candidates.push([box.minX, y]);
-      }
+    // If we only have a start and direction (ray), extend far to create a virtual segment
+    if (p1 && !p2 && edge.direction) {
+      const [dx, dy] = edge.direction;
+      p2 = [p1[0] + dx * 1e6, p1[1] + dy * 1e6]; // huge extension
     }
 
-    // Intersect with right (x = maxX)
-    if (dx !== 0) {
-      const t = (box.maxX - x0) / dx;
-      const y = y0 + t * dy;
-      if (y >= box.minY && y <= box.maxY && t > 0) {
-        candidates.push([box.maxX, y]);
-      }
+    // If we only have an end and direction (reverse ray), extend backwards
+    if (!p1 && p2 && edge.direction) {
+      const [dx, dy] = edge.direction;
+      p1 = [p2[0] - dx * 1e6, p2[1] - dy * 1e6];
     }
 
-    // Intersect with top (y = minY)
-    if (dy !== 0) {
-      const t = (box.minY - y0) / dy;
-      const x = x0 + t * dx;
-      if (x >= box.minX && x <= box.maxX && t > 0) {
-        candidates.push([x, box.minY]);
+    // If still missing one point, we can't clip
+    if (!p1 || !p2) return null;
+
+    // Liang–Barsky algorithm for segment-box clipping
+    let [x0, y0] = p1;
+    let [x1, y1] = p2;
+
+    let t0 = 0;
+    let t1 = 1;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+
+    const clipTest = (p: number, q: number) => {
+      if (p === 0) {
+        if (q < 0) return false; // parallel and outside
+      } else {
+        const r = q / p;
+        if (p < 0) {
+          if (r > t1) return false;
+          if (r > t0) t0 = r;
+        } else if (p > 0) {
+          if (r < t0) return false;
+          if (r < t1) t1 = r;
+        }
       }
-    }
+      return true;
+    };
 
-    // Intersect with bottom (y = maxY)
-    if (dy !== 0) {
-      const t = (box.maxY - y0) / dy;
-      const x = x0 + t * dx;
-      if (x >= box.minX && x <= box.maxX && t > 0) {
-        candidates.push([x, box.maxY]);
-      }
-    }
-
-    // Return the closest valid intersection
-    if (candidates.length === 0) return null;
-
-    candidates.sort((a, b) => {
-      const da = (a[0] - x0) ** 2 + (a[1] - y0) ** 2;
-      const db = (b[0] - x0) ** 2 + (b[1] - y0) ** 2;
-      return da - db;
-    });
-
-    return candidates[0];
-  }
-
-  lineIntersection(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    x3: number,
-    y3: number,
-    x4: number,
-    y4: number
-  ): [number, number] | null {
-    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (denom === 0) return null; // Parallel
-
-    const px =
-      ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) /
-      denom;
-    const py =
-      ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) /
-      denom;
-
-    // Check if intersection is within both segments
-    const within = (min: number, max: number, v: number) =>
-      v >= Math.min(min, max) && v <= Math.max(min, max);
     if (
-      within(x1, x2, px) &&
-      within(y1, y2, py) &&
-      within(x3, x4, px) &&
-      within(y3, y4, py)
+      clipTest(-dx, x0 - minX) &&
+      clipTest(dx, maxX - x0) &&
+      clipTest(-dy, y0 - minY) &&
+      clipTest(dy, maxY - y0)
     ) {
-      return [px, py];
+      if (t1 < 1) {
+        x1 = x0 + t1 * dx;
+        y1 = y0 + t1 * dy;
+      }
+      if (t0 > 0) {
+        x0 = x0 + t0 * dx;
+        y0 = y0 + t0 * dy;
+      }
+      return [
+        [x0, y0],
+        [x1, y1],
+      ];
     }
 
-    return null;
+    return null; // No intersection with box
   }
 
-  bindStart(bounds: BoundingBox): void {
-    const boxEdges = [
-      // Top edge
-      { x1: bounds.minX, y1: bounds.minY, x2: bounds.maxX, y2: bounds.minY },
-      // Right edge
-      { x1: bounds.maxX, y1: bounds.minY, x2: bounds.maxX, y2: bounds.maxY },
-      // Bottom edge
-      { x1: bounds.maxX, y1: bounds.maxY, x2: bounds.minX, y2: bounds.maxY },
-      // Left edge
-      { x1: bounds.minX, y1: bounds.maxY, x2: bounds.minX, y2: bounds.minY },
-    ];
+  relaxFaces(): void {
+    this.faces.forEach((face) => face.relax());
+  }
 
-    for (const edge of this.edges) {
-      const { start, end, leftSite, rightSite } = edge;
-      const leftFace = this.faces.get(leftSite);
-      const rightFace = this.faces.get(rightSite);
-      if (!end) {
-        continue;
+  getFaceSites(): Site[] {
+    const sites: Site[] = [];
+    this.faces.forEach((face) => {
+      if (face.site) {
+        sites.push(face.site);
       }
+    });
+    return sites;
+  }
 
-      for (const boxEdge of boxEdges) {
-        const intersection = this.lineIntersection(
-          start[0],
-          start[1],
-          end[0],
-          end[1],
-          boxEdge.x1,
-          boxEdge.y1,
-          boxEdge.x2,
-          boxEdge.y2
-        );
-
-        if (intersection) {
-          const vertex = new Vertex(intersection[0], intersection[1]);
-
-          // Add to both incident faces
-          if (leftFace) leftFace.corners.add(vertex);
-          if (rightFace) rightFace.corners.add(vertex);
+  assignHeightToFaces(heightMap: number[][]): void {
+    const isInBounds = (x: number, y: number) =>
+      x >= 0 && x < heightMap.length && y >= 0 && y < heightMap[0].length;
+    const getPointValue = (x: number, y: number): number => {
+      return heightMap[x][y];
+    };
+    this.faces.forEach((face) => {
+      if (face.site) {
+        let total = 0;
+        let totalPoints = 0;
+        const x = Math.floor(face.site.x);
+        const y = Math.floor(face.site.y);
+        if (isInBounds(x, y)) {
+          total += getPointValue(x, y);
+          totalPoints++;
+        }
+        face.corners.forEach((corner) => {
+          const x = Math.floor(corner.x);
+          const y = Math.floor(corner.y);
+          if (isInBounds(x, y)) {
+            total += getPointValue(x, y);
+            totalPoints++;
+          }
+        });
+        if (totalPoints > 0) {
+          face.height = total / totalPoints; // Average height
+          this.minHeight = Math.min(this.minHeight, face.height);
+          this.maxHeight = Math.max(this.maxHeight, face.height);
         }
       }
-    }
+    });
+    // Normalize heights to [0, 1]
+    this.faces.forEach((face) => {
+      if (this.maxHeight - this.minHeight > 0 && face.height > 0) {
+        face.height =
+          Math.abs(face.height - this.minHeight) /
+          (this.maxHeight - this.minHeight);
+      } else {
+        face.height = 0; // If all heights are the same, set to 0
+      }
+    });
   }
 }

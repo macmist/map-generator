@@ -7,6 +7,7 @@ export class Face {
   public neighbors: Set<Face> = new Set(); // Store neighboring faces
   public corners: Set<Vertex> = new Set(); // Store vertices that are corners of this face
   public color: string | null = null; // Optional color for visualization
+  public height: number = 0; // Optional height for visualization
   constructor(public site: Site) {}
 
   sortCorners(): Vertex[] {
@@ -20,5 +21,14 @@ export class Face {
 
   asPolygon(): [number, number][] {
     return this.sortCorners().map((v) => [v.x, v.y] as [number, number]);
+  }
+
+  relax(): void {
+    if (this.corners.size === 0) return;
+    const sumX = Array.from(this.corners).reduce((sum, v) => sum + v.x, 0);
+    const sumY = Array.from(this.corners).reduce((sum, v) => sum + v.y, 0);
+    const count = this.corners.size;
+    this.site.x = sumX / count;
+    this.site.y = sumY / count;
   }
 }
