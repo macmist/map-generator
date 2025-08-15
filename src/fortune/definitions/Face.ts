@@ -7,6 +7,7 @@ export class Face {
   public neighbors: Set<Face> = new Set(); // Store neighboring faces
   public corners: Set<Vertex> = new Set(); // Store vertices that are corners of this face
   public color: string | null = null; // Optional color for visualization
+  public height: number = 0; // Optional height for visualization
   constructor(public site: Site) {}
 
   sortCorners(): Vertex[] {

@@ -48,6 +48,15 @@ const POINTS: Point[] = [
   { x: 250, y: 550 },
 ];
 
+const getColorFromHeight = (height: number): string => {
+  if (height < 0.1) return "darkblue";
+  if (height < 0.5) return "blue";
+
+  if (height < 0.6) return "yellow";
+  if (height < 0.7) return "green";
+  return "brown";
+};
+
 const generateRandomPoints = (count: number): Point[] => {
   const points: Point[] = [];
   for (let i = 0; i < count; i++) {
@@ -72,6 +81,7 @@ export const PlayGround = () => {
     setFinishedEdges([]);
     setVertices([]);
     setFaces([]);
+    setConstructionVisible(true);
   }, []);
 
   useEffect(() => {
@@ -105,8 +115,9 @@ export const PlayGround = () => {
       fortune.randomizeColors();
       const faces = Array.from(fortune.faces.values());
       setFaces(faces);
+      console.log("done");
     }
-  }, [points]);
+  }, [points, fortune]);
 
   const box: BoundingBox = {
     minX: 0,
@@ -118,14 +129,16 @@ export const PlayGround = () => {
   const relaxFaces = useCallback(() => {
     fortune.relaxFaces();
     setPoints(fortune.getFaceSites());
+    setConstructionVisible(true);
   }, [fortune]);
 
   const [image, setImage] = useState<HTMLCanvasElement | null>(null);
+  const [grid, setGrid] = useState<number[][]>([]);
 
   const perlinNoise = useCallback(() => {
     perlin.setSeed(Math.random() * 10000);
     const size = box.maxX;
-    const grid = perlin.generateGrid(size, size, 0.05);
+    const grid = perlin.generateGrid(size, size, 0.003);
 
     // Create an offscreen canvas
     const canvas = document.createElement("canvas");
@@ -148,7 +161,32 @@ export const PlayGround = () => {
 
     ctx.putImageData(imageData, 0, 0);
     setImage(canvas);
+    setGrid(grid);
+    setPerlinVisible(true);
+    setConstructionVisible(true);
   }, [box.maxX, perlin]);
+
+  const assignPerlinToFaces = useCallback(() => {
+    setPerlinVisible(false);
+    console.log("Assigning Perlin noise to faces");
+    fortune.assignHeightToFaces(grid);
+    const faces = Array.from(fortune.faces.values());
+    faces.forEach((face) => {
+      const height = face.height;
+      console.log("height", height);
+      face.color = getColorFromHeight(height);
+    });
+    setFaces(faces);
+    setConstructionVisible(true);
+  }, [fortune, grid]);
+
+  const [perlinVisible, setPerlinVisible] = useState(false);
+
+  const [constructionVisible, setConstructionVisible] = useState(true);
+
+  const toggleConstruction = useCallback(() => {
+    setConstructionVisible((prev) => !prev);
+  }, []);
 
   return (
     <Container>
@@ -156,8 +194,9 @@ export const PlayGround = () => {
       <button onClick={() => cleanUp()}>Reset</button>
       <button
         onClick={() => {
-          const randomPoints = generateRandomPoints(500);
+          const randomPoints = generateRandomPoints(1000);
           setPoints(randomPoints);
+          setConstructionVisible(true);
         }}
       >
         Generate points
@@ -170,6 +209,12 @@ export const PlayGround = () => {
         Relax Faces
       </button>
       <button onClick={() => perlinNoise()}>Perlin Noise</button>
+      <button onClick={() => assignPerlinToFaces()}>
+        Assign Perlin to Faces
+      </button>
+      <button onClick={() => toggleConstruction()}>
+        Toggle Construction (Edges, Vertices, Points)
+      </button>
       <div
         style={{ width: box.maxX, height: box.maxY, border: "1px solid black" }}
       >
@@ -191,28 +236,39 @@ export const PlayGround = () => {
               );
             })}
           </Layer>
+          {constructionVisible && (
+            <>
+              <Layer id="points">
+                {points.map((p, i) => (
+                  <PointComponent key={i} x={p.x} y={p.y} />
+                ))}
+              </Layer>
 
-          <Layer id="points">
-            {points.map((p, i) => (
-              <PointComponent key={i} x={p.x} y={p.y} />
-            ))}
-          </Layer>
-          <Layer id="vertices">
-            {vertices.map((p, i) => (
-              <PointComponent key={i} x={p.x} y={p.y} color="red" />
-            ))}
-          </Layer>
+              <Layer id="vertices">
+                {vertices.map((p, i) => (
+                  <PointComponent key={i} x={p.x} y={p.y} color="red" />
+                ))}
+              </Layer>
 
-          <Layer id="edges" clearBeforeDraw={true}>
-            {finshedEdges.map((edge, i) => (
-              <Line
-                key={i}
-                stroke={"orange"}
-                points={[edge.start.x, edge.start.y, edge.end.x, edge.end.y]}
-              />
-            ))}
+              <Layer id="edges" clearBeforeDraw={true}>
+                {finshedEdges.map((edge, i) => (
+                  <Line
+                    key={i}
+                    stroke={"orange"}
+                    points={[
+                      edge.start.x,
+                      edge.start.y,
+                      edge.end.x,
+                      edge.end.y,
+                    ]}
+                  />
+                ))}
+              </Layer>
+            </>
+          )}
+          <Layer id="perlin" opacity={0.5} visible={perlinVisible}>
+            {image && <Image image={image} />}
           </Layer>
-          <Layer opacity={0.5}>{image && <Image image={image} />}</Layer>
         </Stage>
       </div>
     </Container>

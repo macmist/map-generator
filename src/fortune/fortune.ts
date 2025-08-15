@@ -28,6 +28,8 @@ export class FortuneProcessor {
   public edges: Edge[] = [];
   public vertices: Vertex[] = [];
   public faces: Map<Site, Face> = new Map(); // Store faces by their site ID
+  public minHeight: number = Infinity;
+  public maxHeight: number = -Infinity;
 
   constructor() {
     this.beachLine = new BeachLine();
@@ -446,5 +448,48 @@ export class FortuneProcessor {
       }
     });
     return sites;
+  }
+
+  assignHeightToFaces(heightMap: number[][]): void {
+    const isInBounds = (x: number, y: number) =>
+      x >= 0 && x < heightMap.length && y >= 0 && y < heightMap[0].length;
+    const getPointValue = (x: number, y: number): number => {
+      return heightMap[x][y];
+    };
+    this.faces.forEach((face) => {
+      if (face.site) {
+        let total = 0;
+        let totalPoints = 0;
+        const x = Math.floor(face.site.x);
+        const y = Math.floor(face.site.y);
+        if (isInBounds(x, y)) {
+          total += getPointValue(x, y);
+          totalPoints++;
+        }
+        face.corners.forEach((corner) => {
+          const x = Math.floor(corner.x);
+          const y = Math.floor(corner.y);
+          if (isInBounds(x, y)) {
+            total += getPointValue(x, y);
+            totalPoints++;
+          }
+        });
+        if (totalPoints > 0) {
+          face.height = total / totalPoints; // Average height
+          this.minHeight = Math.min(this.minHeight, face.height);
+          this.maxHeight = Math.max(this.maxHeight, face.height);
+        }
+      }
+    });
+    // Normalize heights to [0, 1]
+    this.faces.forEach((face) => {
+      if (this.maxHeight - this.minHeight > 0 && face.height > 0) {
+        face.height =
+          Math.abs(face.height - this.minHeight) /
+          (this.maxHeight - this.minHeight);
+      } else {
+        face.height = 0; // If all heights are the same, set to 0
+      }
+    });
   }
 }
