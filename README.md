@@ -8,7 +8,16 @@ At the moment, it computes a Voronoi Diagram, using the Fortune's algorithm.
 Next steps are, in any order:
 
 - [x] - Correctly generate Faces for the Diagram
-- [ ] - Randomly colorize the Voronoi diagram
-- [ ] - Add Lloyds relaxation
-- [ ] - Generate a random height map
-- [ ] - Apply the height map to the voronoi diagram
+- [x] - Randomly colorize the Voronoi diagram
+- [x] - Add Lloyds relaxation
+- [x] - Generate a random height map
+- [x] - Apply the height map to the voronoi diagram
+- [ ] - Experiment with other way to generate heightmap - Simplex? Diamond Square?
+- [ ] - Better colouring
+- [ ] - Add some rivers
+- [ ] - Add biomes / cities
+- [ ] - Better rendering
+- [ ] - Export function
+- [ ] - Get an online version
+- [ ] - Get my stuff in move in the new world
+- [ ] - Become the master of the new world
