@@ -65,14 +65,6 @@ const generateRandomPoints = (count: number): Point[] => {
   return points;
 };
 
-function islandMask(x: number, y: number, size: number): number {
-  const nx = (x / size) * 2 - 1; // map to -1..1
-  const ny = (y / size) * 2 - 1;
-  const distance = Math.sqrt(nx * nx + ny * ny);
-  // Falloff: 1 at center, 0 at edges
-  return Math.max(0, 1 - distance);
-}
-
 export const PlayGround = () => {
   const [points, setPoints] = useState<Point[]>(POINTS);
   const [vertices, setVertices] = useState<Point[]>([]);
@@ -154,7 +146,51 @@ export const PlayGround = () => {
     const ctx = canvas.getContext("2d")!;
     const imageData = ctx.createImageData(size, size);
 
+    function islandMask(x: number, y: number, size: number): number {
+      // Normalize to [-1, 1]
+      const nx = (x / size) * 2 - 1;
+      const ny = (y / size) * 2 - 1;
+
+      // Distance from center (radial falloff)
+      const distance = Math.sqrt(nx * nx + ny * ny);
+
+      // --- DOMAIN WARPING ---
+      // Use low-frequency noise to warp the coordinates
+      const warpStrength = 0.4; // increase for more twisty islands
+      const warpX =
+        nx +
+        perlin.noise2D(nx * 1.5, ny * 1.5, octaves, persistence, lacunarity) *
+          warpStrength;
+      const warpY =
+        ny +
+        perlin.noise2D(
+          nx * 1.5 + 100,
+          ny * 1.5 + 100,
+          octaves,
+          persistence,
+          lacunarity
+        ) *
+          warpStrength;
+
+      // --- NOISE-BASED SHAPE MASK ---
+      const shapeNoise = perlin.noise2D(
+        warpX * 2.0,
+        warpY * 2.0,
+        octaves,
+        persistence,
+        lacunarity
+      );
+
+      // Combine radial falloff + noisy shape
+      let mask = 1 - distance; // base circle
+      mask += shapeNoise * 0.4; // irregular edges
+      mask = Math.max(0, Math.min(1, mask)); // clamp 0..1
+
+      return mask;
+    }
+    let c_grid: number[][] = [];
     for (let y = 0; y < size; y++) {
+      c_grid.push([]);
       for (let x = 0; x < size; x++) {
         let noiseValue = perlin.noise2D(
           x * scale,
@@ -166,7 +202,7 @@ export const PlayGround = () => {
 
         const mask = islandMask(x, y, size);
         const value = noiseValue * mask;
-        grid[y][x] = value; // Store the value in the grid
+        c_grid[y][x] = value; // Store the value in the grid
         const shade = Math.floor(value * 255);
         const idx = (y * size + x) * 4;
         imageData.data[idx] = shade;
@@ -178,10 +214,10 @@ export const PlayGround = () => {
 
     ctx.putImageData(imageData, 0, 0);
     setImage(canvas);
-    setGrid(grid);
+    setGrid(c_grid);
     setPerlinVisible(true);
     setConstructionVisible(true);
-  }, [box.maxX, grid, perlin]);
+  }, [box.maxX, perlin]);
 
   const assignPerlinToFaces = useCallback(() => {
     setPerlinVisible(false);
